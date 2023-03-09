@@ -1,0 +1,5 @@
+package attini.step.guard;
+
+public enum EventType {
+    INIT_DEPLOY_CFN, CFN_SNS, CFN_MANUAL, INIT_DEPLOY_MANUAL_TRIGGER, MANUAL_APPROVAL, CDK_REGISTER_STACKS
+}

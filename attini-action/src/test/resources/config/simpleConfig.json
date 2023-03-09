@@ -1,0 +1,10 @@
+{
+  "template": "my/path",
+  "enableTerminationProtection": true,
+  "parameters": {
+      "Ram" : 128
+  },
+  "tags": {
+    "Author" : "Oscar"
+  }
+}

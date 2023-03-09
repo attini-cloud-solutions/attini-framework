@@ -1,0 +1,33 @@
+{
+    "attiniActionType": "DeployCfn",
+    "Properties": {
+        "StackRoleArn": "arn:aws:iam::655047308345:role/dev-test-cfn-role-eu-west-1",
+        "StackName": "Vpc",
+        "Template": "/network/vpc.yaml"
+    },
+    "deploymentPlanExecutionMetadata": {
+        "executionStartTime": "2021-02-23T12:15:27.248Z",
+        "sfnToken": "AAAAKgAAAAIAAAAAAAAAAXu1wyfjrQT9YVypUtwOcmYzRYSFD/X4bO1D3JVOJv6nDa20oi0zb4/HmCLeGwZUhhNC7n+OTGp9ZQRDlrIROBtB8/jnSDRu4Vk/DcHGe5ffoVJ8xIPT1kUicJmdcvTYXuYxuJCO8NUvL2BxE0yA+ebiEpfEZhclCKUsspdjx6KhKV+Ridu/8FeTWhw4TvwK4knzh4K8cpyvW6TUNKVQq2NmaCjlkR3Pc5E3ceXNnKBKy4shjZPIuj2tJA2ldIKffgmUpViv6VRS1yBI9S1gJy23fY1cxI7mTxmkWgQan5vT5zG1qIGz6mHGwvU5pKy8CtAFqm5swlbqD2aW624diIiOzh9OnyTThqb2oclELcNMYvC31Q4bQg8NsYo8FvmiK5J4yIo+E1G4gQYXCl5P9/oQ47Zr0ImaZeEAE0wj4r/M0VD63dpTzCpzi/5NAI4OOismsn3IrPEfZ50V2X/X0L5Y3GleRVIBVLpV1ZAshacT18KyCbz7QQTir6KjeTyEslryhmbnG40BjZqXjVQJHLBmLI5EknMNHsVOcZo2K2G1Dwxdu6071sSWuZQq0L2qSr2hXJaZOj2ggbMbegCR3V0116mQkqVzLKyg8eofW12sSrp8aV52Pq54goq+9Avdjh2iVfBhOLAiOaqKUTOZGWlhuvmSDlyjvtpha7yk+Trg",
+        "executionArn": "arn:aws:states:eu-west-1:655047308345:execution:PipelineAttiniDeploymentPlanSfn-JrVqujOxtZcG:03e10a98-86fe-466e-8f05-0e530779fe6e",
+        "retryCounter": 0,
+        "stepName": "myStep"
+    },
+    "customData": {},
+    "deploymentOriginData": {
+        "distributionName": "infra",
+        "deploymentTime": "1614082487788",
+        "objectIdentifier": "7413894bcd7ad3947e5be44ab66555c0",
+        "distributionTags": {
+                      "Version": "1.1.2",
+                      "Branch": "hotfix/bugfix"
+                  },
+        "deploymentSource": {
+            "deploymentSourcePrefix": "dev/infra/06496df7-194f-46e6-b250-c0c2a7fcf97d/distribution-origin",
+            "deploymentSourceBucket": "attini-artifact-store-eu-west-1-655047308345"
+        },
+        "environment": "dev",
+        "distributionId": "06496df7-194f-46e6-b250-c0c2a7fcf97d",
+        "deploymentName": "dev-infra",
+        "stackName": "dev-infra-init-deploy"
+    }
+}

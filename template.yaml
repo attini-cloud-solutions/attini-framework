@@ -1,0 +1,1905 @@
+# Copyright (c) 2023 Attini Cloud Solutions International AB.
+# All Rights Reserved
+
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+
+Description: Attini setup 0.0.0
+
+Parameters:
+  Email:
+    Type: String
+    Description: This email is only used to send operational information when needed, no marketing information will be sent here.
+    Default: ""
+
+  EnvironmentParameterName:
+    Type: String
+    Description: If you have a Cloudformation parameter AttiniEnvironmentName in any of your templates, Attini will automatically configure it. If you want this parameter to be called somthing else in your templates, you can override it here.
+    Default: "AttiniEnvironmentName"
+
+  RetainDistributionDays:
+    Type: Number
+    Description: Specify how many days a distribution should be retained, specify 0 to retain forever. Find more information at https://docs.attini.io/architecture/attini-artifact-life-cycle.html
+    Default: 10
+
+  RetainDistributionVersions:
+    Type: Number
+    Description: Specify how many distributions should be retained, specify 0 to retain all forever. Find more information at https://docs.attini.io/architecture/attini-artifact-life-cycle.html
+    Default: 10
+
+  CreateInitDeployDefaultRole:
+    Type: String
+    Default: "false"
+    Description: |
+      Should Attini create a high privileged default role for InitDeploy? If this is false you have to configure InitDeployRoleArn.
+    AllowedValues:
+      - "true"
+      - "false"
+
+  InitDeployRoleArn:
+    Type: String
+    Default: ""
+    Description: |
+      Arn for the InitDeploy lambda role. This role needs the privileges to create all the resources you need for your DeploymentPlans.
+
+  AttachLeastPrivilegePolicyToInitDeployRole:
+    Type: String
+    Default: "true"
+    Description: |
+        If InitDeployRoleArn is configured, should the attini-setup attach a least privilege policy to that IAM Role?
+        If you configure this to be false, you need to give InitDeployRole adequate permissions, otherwise there
+        is a risk that deployments freeze without proper error messages.
+    AllowedValues:
+      - "true"
+      - "false"
+
+  CreateDeploymentPlanDefaultRole:
+    Type: String
+    Default: "true"
+    Description: |
+        Should Attini create a default Service role for the Attini DeploymentPlans underlying AWS StepFunctions?
+
+        The default role have permission to trigger/run/execute/publish/put on any
+        AWS Lambda, AWS StepFunction, ECS task, CodeBuild project, SNS topic or SQS que in your AWS Account.
+
+        NOTE: If this is false, you will have to configure an RoleArn for every Attini DeploymentPlan you create.
+    AllowedValues:
+      - "true"
+      - "false"
+
+  GiveAdminAccess:
+    Type: String
+    Default: "false"
+    Description: |
+      Gives the Attini framework admin access.
+      This will create two admin roles, one for the Attini runner and one for the Attini action lambda function,
+      which runs Attini steps like AttiniCfn or AttiniSam. These roles will be used unless another role is specified.
+    AllowedValues:
+      - "true"
+      - "false"
+
+  UseAdministratorAccessForDeployingCloudformation:
+    Type: String
+    Default: "false"
+    Description: |
+      This parameter is deprecated. See GiveAdminAccess instead.
+    AllowedValues:
+      - "true"
+      - "false"
+
+  VpcId:
+    Type: String
+    Description: If you require the Attini Lambda functions to be executed in any specific VPC, please fill it here. This also requires SubnetsIds to be configured.
+    Default: "AwsManagedNetwork"
+
+  SubnetsIds:
+    Type: CommaDelimitedList
+    Description: If you require the Attini Lambda functions to be executed in any specific subnets, please fill it here. This also requers VpcId to be configured.
+    Default: "AwsManagedNetwork"
+
+  AwsServiceRolesContainsString:
+    Type: String
+    Description: |
+      To apply a Stack role to a Cloudformation Stack, Attini needs the permission to do iam:PassRole to IAM Service role for CloudFormation.
+      To limit Attini's access, you can set a required IAM Role path and/or IAM Role name prefix. If you want Attini to be able to apply
+      any IAM Service role to your CloudFormation Stack, configure this to be *.
+    Default: "attini"
+
+  LogLevel:
+    Type: String
+    Default: INFO
+    Description: The log level that all Attini services should use
+    AllowedValues:
+      - "ALL"
+      - "TRACE"
+      - "DEBUG"
+      - "INFO"
+      - "WARN"
+      - "ERROR"
+      - "FATAL"
+      - "OFF"
+
+  ResourceAllocation:
+    Type: String
+    Default: "Dynamic"
+    Description: Configure ReservedConcurrentExecutions for the Attini Lambda functions. Find more details here https://docs.attini.io/getting-started/installations/deploy-and-update-the-attini-framework.html
+    AllowedValues:
+      - "Dynamic"
+      - "Small"
+      - "Medium"
+      - "Large"
+
+  AutoUpdate:
+    Type: String
+    Description: Should Attini framework auto update? If yes, enter a cron or rate expressions for when it should be done. If you don't want in to auto update, leave this field empty. More info about cron or rate expressions https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
+    Default: ""
+
+  LicenseToken:
+    Type: String
+    Default: "no-support-agreement"
+    Description: If you have a support agreement with attini, you can create a token in the Attini admin portal at https://admin.attini.io/login
+
+  AcceptLicenseAgreement:
+    Type: String
+    Default: "false"
+    Description: Accept the Attini licence agreement. Find more information at https://docs.attini.io/pricing-and-license/product-offering.html
+    AllowedValues:
+      - "true"
+      - "false"
+
+
+Rules:
+  AcceptLicenseAgreement:
+    Assertions:
+    - Assert:
+        !Equals
+          - !Ref AcceptLicenseAgreement
+          - "true"
+      AssertDescription: You have to accept the licence agreement.
+
+  CreateInitDeployDefaultRole:
+    RuleCondition:
+      !Equals
+        - !Ref InitDeployRoleArn
+        - ""
+    Assertions:
+      - Assert:
+          !Equals
+            - !Ref CreateInitDeployDefaultRole
+            - "true"
+        AssertDescription: |
+          If you don't configure the InitDeployRoleArn, CreateInitDeployDefaultRole have to be true,
+          otherwise the Attini Framework won't work.
+
+  ValidateInitDeployDefaultRoleConfig:
+    RuleCondition:
+      !Not
+        - !Equals
+          - !Ref InitDeployRoleArn
+          - ""
+    Assertions:
+      - Assert:
+          !Equals
+            - !Ref CreateInitDeployDefaultRole
+            - "false"
+        AssertDescription: |
+          If you have configured an InitDeployRoleArn, CreateInitDeployDefaultRole have to be false.
+
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: General
+      Parameters:
+        - Email
+        - EnvironmentParameterName
+    - Label:
+        default: Security
+      Parameters:
+        - CreateInitDeployDefaultRole
+        - InitDeployRoleArn
+        - AttachLeastPrivilegePolicyToInitDeployRole
+        - CreateDeploymentPlanDefaultRole
+        - GiveAdminAccess
+        - UseAdministratorAccessForDeployingCloudformation
+        - VpcId
+        - SubnetsIds
+        - AwsServiceRolesContainsString
+    - Label:
+        default: Operations
+      Parameters:
+        - ResourceAllocation
+        - RetainDistributionDays
+        - RetainDistributionVersions
+        - AutoUpdate
+        - LogLevel
+    - Label:
+        default: Licence
+      Parameters:
+        - LicenseToken
+        - AcceptLicenseAgreement
+
+
+Globals:
+  Function:
+    Timeout: 600
+    Tracing: Active
+    Tags:
+      Attini: "-"
+    Environment:
+      Variables:
+        AWS_ACCOUNT_ID: !Ref AWS::AccountId
+        ENVIRONMENT_PARAMETER_NAME: !Ref EnvironmentParameterName
+        DISABLE_SIGNAL_HANDLERS: true
+        ATTINI_ARTIFACT_BUCKET: !Ref AttiniArtifactBucket
+        LOG_LEVEL: !Ref LogLevel
+        ATTINI_RESOURCE_STATES_TABLE: !Ref AttiniResourceStatesTableV1
+        ATTINI_DEPLOYMENT_ORIGIN_TABLE: !Ref AttiniDeploymentOriginTableV1
+        ATTINI_VERSION: __ATTINI_DISTRIBUTION_VERSION__ # This value is set via build magic
+        EMAIL: !Ref Email
+    VpcConfig:
+      !If
+        - CustomNetwork
+        - SecurityGroupIds:
+            - !Ref AttiniDefaultSecurityGroup
+          SubnetIds: !Ref SubnetsIds
+        - !Ref AWS::NoValue
+
+
+Conditions:
+  UseDefaultRoleForInitDeploy:
+    !And
+      - !Equals
+        - !Ref CreateInitDeployDefaultRole
+        - "true"
+      - !Equals
+        - !Ref InitDeployRoleArn
+        - ""
+
+  AttachLeastPrivilegePolicyToInitDeployRole:
+    !Or
+      - Condition: UseDefaultRoleForInitDeploy
+      - !Equals
+        - !Ref AttachLeastPrivilegePolicyToInitDeployRole
+        - True
+
+  CreateDeploymentPlanDefaultRole:
+    !Equals
+      - !Ref CreateDeploymentPlanDefaultRole
+      - True
+
+  GiveAdminAccess:
+    !Equals
+      - !Ref GiveAdminAccess
+      - True
+
+  AwsServiceRolesContainsString:
+    !Equals
+      - !Ref AwsServiceRolesContainsString
+      - "*"
+
+  UseAutoUpdate:
+    !Not
+      - !Equals
+        - !Ref AutoUpdate
+        - ""
+
+  ResourceAllocation:
+    !Equals
+      - !Ref ResourceAllocation
+      - "Dynamic"
+
+  CustomNetwork:
+    !And
+    - !Not
+      - !Equals
+        - !Select [0, !Ref SubnetsIds]
+        - "AwsManagedNetwork"
+    - !Not
+      - !Equals
+        - !Ref VpcId
+        - "AwsManagedNetwork"
+
+  CodeSigningSupported:
+    !Not
+      - !Or
+        - !Equals
+          - !Ref AWS::Region
+          - ap-northeast-3
+        - !Equals
+          - !Ref AWS::Region
+          - ap-southeast-3
+        - !Equals
+          - !Ref AWS::Region
+          - ap-southeast-4
+        - !Equals
+          - !Ref AWS::Region
+          - me-central-1
+        - !Equals
+          - !Ref AWS::Region
+          - eu-south-2
+        - !Equals
+          - !Ref AWS::Region
+          - eu-central-2
+        - !Equals
+          - !Ref AWS::Region
+          - ap-south-2
+
+
+  ResourceGroupsSupported:
+    !Not
+      - !Or
+        - !Equals
+          - !Ref AWS::Region
+          - eu-south-2
+        - !Equals
+          - !Ref AWS::Region
+          - eu-central-2
+        - !Equals
+          - !Ref AWS::Region
+          - ap-south-2
+        - !Equals
+          - !Ref AWS::Region
+          - ap-southeast-4
+
+Mappings:
+  ResourceAllocation:
+    Dynamic:
+      AttiniDeploymentPlanSetupFunction: N/A
+      AttiniInitDeployFunction: N/A
+      AttiniActionFunction: N/A
+      AttiniStepGuardFunction: N/A
+    Small:
+      AttiniDeploymentPlanSetupFunction: 2
+      AttiniInitDeployFunction: 2
+      AttiniActionFunction: 4
+      AttiniStepGuardFunction: 5
+    Medium:
+      AttiniDeploymentPlanSetupFunction: 4
+      AttiniInitDeployFunction: 4
+      AttiniActionFunction: 6
+      AttiniStepGuardFunction: 15
+    Large:
+      AttiniDeploymentPlanSetupFunction: 8
+      AttiniInitDeployFunction: 8
+      AttiniActionFunction: 12
+      AttiniStepGuardFunction: 40
+
+
+Resources:
+
+  AcceptUserAgreementV1:
+    Type: Custom::AcceptUserAgreement
+    Properties:
+      ServiceToken: !GetAtt AttiniActionFunction.Arn
+      Region: !Ref AWS::Region
+      Acceptance: !Ref AcceptLicenseAgreement
+
+  ConfigurationMutationsV1:
+    Type: Custom::ConfigurationMutations
+    DependsOn:
+      - AttiniInitDeployFunction
+    Properties:
+      ServiceToken: !GetAtt AttiniActionFunction.Arn
+      InitDeployRoleArn: !Ref InitDeployRoleArn
+
+  AttiniDefaultSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Condition: CustomNetwork
+    Properties:
+      GroupDescription: SecurityGroup created for the attini framework, this is group should have no openings.
+      GroupName: !Sub ${AWS::StackName}-security-group
+      Tags:
+        - Key: Attini
+          Value: "-"
+      VpcId: !Ref VpcId
+
+
+  AttiniCodeSigningConfig:
+    Type: AWS::Lambda::CodeSigningConfig
+    Condition: CodeSigningSupported
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      AllowedPublishers:
+        SigningProfileVersionArns:
+          - arn:aws:signer:eu-west-1:737842277702:/signing-profiles/attini_signature/sLBdQHvSCa
+      CodeSigningPolicies:
+        UntrustedArtifactOnDeployment: Warn # This is changed to "Enforce" by our build script
+      Description: Code signing config that verifies that the lambda code is built by Attini
+
+
+  AttiniDeploymentPlanMacro:
+    Type: AWS::CloudFormation::Macro
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      Name: AttiniDeploymentPlan
+      Description: Attini deployment plan generator
+      FunctionName: !GetAtt AttiniDeploymentPlanSetupFunction.Arn
+
+
+  AttiniDeploymentPlanSetupFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+      - AttiniDeploymentPlanSetupLogGroup
+    Properties:
+      FunctionName: attini-deployment-plan-setup
+      CodeUri: attini-deployment-plan-setup/target/function.zip
+      Handler: not.used.in.provided.runtime
+      Runtime: provided.al2
+      MemorySize: 256
+      Role: !GetAtt AttiniDeploymentPlanSetupLambdaServiceRole.Arn
+      Events:
+        DeploymentStatus:
+          Type: SNS
+          Properties:
+            Topic: !Ref AttiniDeploymentStatus
+      ReservedConcurrentExecutions:
+        !If
+          - ResourceAllocation
+          - !Ref AWS::NoValue
+          - !FindInMap [ ResourceAllocation, !Ref ResourceAllocation, AttiniDeploymentPlanSetupFunction ]
+      CodeSigningConfigArn:
+        !If
+          - CodeSigningSupported
+          - !GetAtt AttiniCodeSigningConfig.CodeSigningConfigArn
+          - !Ref AWS::NoValue
+      Environment:
+        Variables:
+          ATTINI_DEPLOYMENT_PLAN_DEFAULT_ROLE: !If
+            - CreateDeploymentPlanDefaultRole
+            - !GetAtt AttiniDeploymentPlanDefaultStatesServiceRole.Arn
+            - !Ref AWS::NoValue
+
+
+  AttiniDeploymentPlanSetupLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      LogGroupName: !Sub /aws/lambda/attini-deployment-plan-setup
+      RetentionInDays: 30
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+
+  AttiniDeploymentPlanSetupLambdaServiceRole:
+    Type: AWS::IAM::Role
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      RoleName: !Sub attini-deployment-plan-setup-lambda-role-${AWS::Region}
+      Path: /attini/
+      Tags:
+        - Key: Attini
+          Value: "-"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-deployment-plan-inline-policy
+          PolicyDocument:
+            Statement:
+              - Action:
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackResource
+                  - ec2:describeVpcs
+                  - ec2:describeSubnets
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:UpdateItem
+                Effect: Allow
+                Resource:
+                - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AttiniResourceStatesV1
+              - Action:
+                  - dynamodb:Query
+                  - dynamodb:UpdateItem
+                Effect: Allow
+                Resource:
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AttiniDeployData*
+
+
+  AttiniRespondToCfnEvent:
+    Type: AWS::SNS::Topic
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      DisplayName: attini-respond-to-cfn-event
+      Tags:
+      - Key: Attini
+        Value: "-"
+      TopicName: attini-respond-to-cfn-event
+
+
+  AttiniDeploymentStatus:
+    Type: AWS::SNS::Topic
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      DisplayName: attini-deployment-status
+      Tags:
+      - Key: Attini
+        Value: "-"
+      TopicName: attini-deployment-status
+
+
+  AttiniRespondToInitDeployCfnEvent:
+    Type: AWS::SNS::Topic
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      DisplayName: attini-respond-to-init-deploy-cfn-event
+      Tags:
+        - Key: Attini
+          Value: "-"
+      TopicName: attini-respond-to-init-deploy-cfn-event
+
+
+  AttiniStepGuardFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+      - AttiniStepGuardLogGroup
+    Properties:
+      FunctionName: attini-step-guard
+      CodeUri: attini-step-guard/target/function.zip
+      Handler: not.used.in.provided.runtime
+      Runtime: provided.al2
+      MemorySize: 128
+      Role: !GetAtt AttiniStepGuardLambdaServiceRole.Arn
+      Events:
+        CfnEvent:
+          Type: SNS
+          Properties:
+            Topic: !Ref AttiniRespondToCfnEvent
+        InitDeployCfnEvent:
+          Type: SNS
+          Properties:
+            Topic: !Ref AttiniRespondToInitDeployCfnEvent
+      CodeSigningConfigArn:
+        !If
+          - CodeSigningSupported
+          - !GetAtt AttiniCodeSigningConfig.CodeSigningConfigArn
+          - !Ref AWS::NoValue
+      ReservedConcurrentExecutions:
+        !If
+          - ResourceAllocation
+          - !Ref AWS::NoValue
+          - !FindInMap [ ResourceAllocation, !Ref ResourceAllocation, AttiniStepGuardFunction ]
+      Environment:
+        Variables:
+          ATTINI_DEPLOYMENT_PLAN_DEFAULT_ROLE: !If
+            - CreateDeploymentPlanDefaultRole
+            - !GetAtt AttiniDeploymentPlanDefaultStatesServiceRole.Arn
+            - !Ref AWS::NoValue
+          ATTINI_RESPOND_TO_CFN_EVENT: !Ref AttiniRespondToCfnEvent
+          ATTINI_RESPOND_TO_INIT_DEPLOY_CFN_EVENT: !Ref AttiniRespondToInitDeployCfnEvent
+          ATTINI_DEPLOY_CFN_LAMBDA_SERVICE_ROLE: !Sub arn:aws:iam::${AWS::AccountId}:role/attini/attini-action-role-${AWS::Region} # !GetAtt AttiniActionLambdaServiceRole.Arn
+          DEPLOYMENT_STATUS_TOPIC: !Ref AttiniDeploymentStatus
+
+
+  AttiniStepGuardEventInvokeConfig:
+    Type: AWS::Lambda::EventInvokeConfig
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      FunctionName: !Ref AttiniStepGuardFunction
+      MaximumRetryAttempts: 0
+      Qualifier: $LATEST
+
+
+  AttiniStepGuardLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      LogGroupName: !Sub /aws/lambda/attini-step-guard
+      RetentionInDays: 30
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+
+  AttiniStepGuardLambdaServiceRole:
+    Type: AWS::IAM::Role
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      RoleName: !Sub attini-step-guard-lambda-role-${AWS::Region}
+      Path: /attini/
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-step-guard-inline-policy
+          PolicyDocument:
+            Statement:
+              - Action:
+                  - states:SendTaskFailure
+                  - states:SendTaskSuccess
+                  - states:StartExecution
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                  - sns:Publish
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                  - sts:AssumeRole
+                Effect: Allow
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/attini/attini-action-role-${AWS::Region}
+              - Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                Effect: Allow
+                Resource:
+                  - !GetAtt AttiniDeploymentOriginTableV1.Arn
+                  - !Sub ${AttiniDeploymentOriginTableV1.Arn}/*
+                  - !GetAtt AttiniResourceStatesTableV1.Arn
+              - Action:
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:Describe*
+                  - cloudformation:List*
+                  - cloudformation:Get*
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                  - s3:PutObject*
+                  - s3:ListBucket
+                  - s3:GetObject*
+                Effect: Allow
+                Resource:
+                  - !Sub ${AttiniArtifactBucket.Arn}/*
+                  - !GetAtt AttiniArtifactBucket.Arn
+
+
+  AttiniActionFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+      - AttiniActionLogGroup
+    Properties:
+      FunctionName: attini-action
+      CodeUri: attini-action/target/function.zip
+      Handler: not.used.in.provided.runtime
+      Runtime: provided.al2
+      MemorySize: 256
+      Role: !GetAtt AttiniActionLambdaServiceRole.Arn
+      CodeSigningConfigArn:
+        !If
+          - CodeSigningSupported
+          - !GetAtt AttiniCodeSigningConfig.CodeSigningConfigArn
+          - !Ref AWS::NoValue
+      ReservedConcurrentExecutions:
+        !If
+          - ResourceAllocation
+          - !Ref AWS::NoValue
+          - !FindInMap [ ResourceAllocation, !Ref ResourceAllocation, AttiniActionFunction ]
+      Environment:
+        Variables:
+          ATTINI_DEPLOYMENT_PLAN_DEFAULT_ROLE: !If
+            - CreateDeploymentPlanDefaultRole
+            - !GetAtt AttiniDeploymentPlanDefaultStatesServiceRole.Arn
+            - !Ref AWS::NoValue
+          ATTINI_RESPOND_TO_CFN_EVENT: !Ref AttiniRespondToCfnEvent
+          ATTINI_STEP_GUARD: !GetAtt AttiniStepGuardFunction.Arn
+          LICENCE_TOKEN: !Ref LicenseToken
+          DEPLOYMENT_STATUS_TOPIC: !Ref AttiniDeploymentStatus
+
+
+  PostDeployHookTrigger:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt AttiniActionFunction.Arn
+      Principal: events.amazonaws.com
+
+
+  AttiniActionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      LogGroupName: !Sub /aws/lambda/attini-action
+      RetentionInDays: 30
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+
+  AttiniActionLambdaServiceRole:
+    Type: AWS::IAM::Role
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      RoleName: !Sub attini-action-role-${AWS::Region}
+      Path: /attini/
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+              AWS: !GetAtt AttiniStepGuardLambdaServiceRole.Arn
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        !If
+          - GiveAdminAccess
+          - - arn:aws:iam::aws:policy/AdministratorAccess
+          - - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+            - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+            - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+            - !Ref AttiniCfnPolicy
+      Policies:
+        !If
+          - GiveAdminAccess
+          - !Ref AWS::NoValue
+          - - PolicyName: !Sub ${AWS::StackName}-least-privilege-inline-policy
+              PolicyDocument:
+                Statement:
+                  - Action:
+                      - states:SendTaskFailure
+                      - states:SendTaskSuccess
+                      - states:StartExecution
+                      - states:ListExecutions
+                      - states:StopExecution
+                      - states:GetExecutionHistory
+                    Effect: Allow
+                    Resource:
+                      - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:AttiniDeploymentPlanSfn*
+                      - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:AttiniDeploymentPlanSfn*
+                  - Action:
+                      - iam:PassRole
+                    Effect: Allow
+                    Resource:
+                      !If
+                        - AwsServiceRolesContainsString
+                        - "*"
+                        - - !Sub arn:aws:iam::${AWS::AccountId}:role/*${AwsServiceRolesContainsString}*
+                          - !Sub arn:aws:iam::${AWS::AccountId}:role/*/*${AwsServiceRolesContainsString}*
+                          - !Sub arn:aws:iam::${AWS::AccountId}:role/attini/*
+                    Condition:
+                      StringLike:
+                        iam:AssociatedResourceARN:
+                          - !Sub arn:aws:cloudformation:*:${AWS::AccountId}:stack/*
+                          - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/*
+                  - Action:
+                      - sts:AssumeRole
+                      - sts:TagSession
+                    Effect: Allow
+                    Resource: "*"
+                  - Action:
+                      - dynamodb:PutItem
+                      - dynamodb:Query
+                      - dynamodb:GetItem
+                      - dynamodb:UpdateItem
+                    Effect: Allow
+                    Resource:
+                    - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AttiniDeployData*
+                    - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AttiniResourceStates*
+                  - Action:
+                      - lambda:InvokeFunction
+                    Effect: Allow
+                    Resource:
+                      - !GetAtt AttiniStepGuardFunction.Arn
+                  - Action:
+                      - cloudformation:Describe*
+                      - cloudformation:List*
+                      - cloudformation:Get*
+                      - cloudformation:CreateChangeSet
+                    Effect: Allow
+                    Resource: "*"
+                  - Action:
+                      - cloudformation:CreateStack
+                      - cloudformation:TagResource
+                      - cloudformation:UntagResource
+                    Effect: Allow
+                    Resource: "*"
+                    Condition:
+                      StringEquals:
+                        aws:RequestTag/AttiniResourceType: cloudformation-stack
+                  - Action:
+                      - cloudformation:TagResource
+                      - cloudformation:UntagResource
+                      - cloudformation:CancelUpdateStack
+                      - cloudformation:ContinueUpdateRollback
+                      - cloudformation:DeleteStack
+                      - cloudformation:UpdateStack
+                      - cloudformation:DetectStackDrift
+                    Effect: Allow
+                    Resource: "*"
+                    Condition:
+                      StringEquals:
+                        aws:ResourceTag/AttiniResourceType: cloudformation-stack
+                  - Action:
+                      - s3:PutObject*
+                      - s3:ListBucket
+                      - s3:GetObject*
+                    Effect: Allow
+                    Resource:
+                      - !Sub ${AttiniArtifactBucket.Arn}/*
+                      - !GetAtt AttiniArtifactBucket.Arn
+                  - Action:
+                      - organizations:DescribeOrganization
+                    Effect: Allow
+                    Resource: "*"
+                  - Action:
+                      - sns:Publish
+                    Effect: Allow
+                    Resource: !Ref AttiniDeploymentStatus
+                  - Action:
+                      - ssm:PutParameter
+                      - ssm:AddTagsToResource
+                      - ssm:ListTagsToResource
+                      - ssm:RemoveTagsToResource
+                      - ssm:GetParameter*
+                      - ssm:DeleteParameter
+                      - ssm:DeleteParameters
+                      - ssm:DescribeParameters
+                    Effect: Allow
+                    Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/attini/*
+                  - Action:
+                      - sqs:SendMessage
+                    Resource:
+                    - !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:*AttiniRunnerQueue*
+                    Effect: Allow
+                  - Action:
+                      - ecs:DescribeTaskDefinition
+                      - ecs:DescribeTasks
+                      - ecs:RunTask
+                      - ecs:StopTask
+                    Resource: "*"
+                    Effect: Allow
+
+
+  AttiniCfnPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      ManagedPolicyName: !Sub attini-cfn-policy-${AWS::Region}
+      Description: This policy allow cloudformation to use the Attini framework
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - sns:publish
+            Effect: Allow
+            Resource: !Ref AttiniRespondToCfnEvent
+
+
+  AttiniInitDeployEventInvokeConfig:
+    Type: AWS::Lambda::EventInvokeConfig
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      FunctionName: !Ref AttiniInitDeployFunction
+      MaximumRetryAttempts: 0
+      Qualifier: $LATEST
+
+
+  AttiniInitDeployFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+      - AttiniInitDeployLogGroup
+    Properties:
+      FunctionName: attini-init-deploy
+      CodeUri: attini-deploy-origin/target/function.zip
+      Handler: not.used.in.provided.runtime
+      Runtime: provided.al2
+      MemorySize: 1535
+      Role:
+        !If
+          - UseDefaultRoleForInitDeploy
+          - !GetAtt AttiniInitDeployLambdaServiceRole.Arn
+          - !Ref InitDeployRoleArn
+      CodeSigningConfigArn:
+        !If
+          - CodeSigningSupported
+          - !GetAtt AttiniCodeSigningConfig.CodeSigningConfigArn
+          - !Ref AWS::NoValue
+      ReservedConcurrentExecutions:
+        !If
+          - ResourceAllocation
+          - !Ref AWS::NoValue
+          - !FindInMap [ ResourceAllocation, !Ref ResourceAllocation, AttiniInitDeployFunction ]
+      Environment:
+        Variables:
+          ATTINI_CONFIG_FILE: attini-config
+          ATTINI_RESPOND_TO_CFN_EVENT: !Ref AttiniRespondToCfnEvent
+          ATTINI_RESPOND_TO_INIT_DEPLOY_CFN_EVENT: !Ref AttiniRespondToInitDeployCfnEvent
+          RETAIN_DISTRIBUTION_DAYS: !Ref RetainDistributionDays
+          RETAIN_DISTRIBUTION_VERSIONS: !Ref RetainDistributionVersions
+          DEPLOYMENT_STATUS_TOPIC: !Ref AttiniDeploymentStatus
+          ATTINI_STEP_GUARD: !GetAtt AttiniStepGuardFunction.Arn
+
+
+  AttiniInitDeployLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      LogGroupName: !Sub /aws/lambda/attini-init-deploy
+      RetentionInDays: 30
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+
+  AttiniInitDeployLambdaServiceRole:
+    Type: AWS::IAM::Role
+    Condition: UseDefaultRoleForInitDeploy
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      RoleName: !Sub attini-init-deploy-lambda-role-${AWS::Region}
+      Path: /attini/
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-init-deploy-role-inline-policy
+          PolicyDocument:
+            Statement:
+            - Action:
+                - states:ListStateMachines
+                - states:DescribeStateMachine
+                - states:ListTagsForResource
+              Effect: Allow
+              Resource: '*'
+            - Action:
+                - states:TagResource
+                - states:UntagResource
+                - states:CreateStateMachine
+                - states:DeleteStateMachine
+                - states:UpdateStateMachine
+              Effect: Allow
+              Resource:
+                - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:AttiniDeploymentPlanSfn*
+            - Action:
+                - lambda:ListFunctions
+                - lambda:GetFunction
+                - lambda:ListTags
+                - lambda:GetPolicy
+                - lambda:TagResource
+                - lambda:UntagResource
+                - lambda:CreateFunction
+                - lambda:CreateEventSourceMapping
+                - lambda:DeleteFunction
+                - lambda:DeleteFunctionEventInvokeConfig
+                - lambda:UpdateFunctionCode
+                - lambda:UpdateFunctionConfiguration
+                - lambda:UpdateFunctionEventInvokeConfig
+                - lambda:AddPermission
+                - lambda:RemovePermission
+                - events:ListRules
+                - events:PutRule
+                - events:DescribeRule
+                - events:DeleteRule
+                - events:EnableRule
+                - events:TagResource
+                - events:UntagResource
+                - events:ListTagsForResource
+                - events:RemoveTargets
+                - events:PutTargets
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:DeleteLogGroup
+                - logs:DeleteLogStream
+                - logs:PutLogEvents
+                - logs:PutRetentionPolicy
+                - logs:DeleteRetentionPolicy
+                - logs:UntagLogGroup
+                - logs:TagLogGroup
+                - logs:ListTagsLogGroup
+                - logs:DescribeLogGroups
+                - iam:GetRole
+                - iam:GetRolePolicy
+                - iam:GetServiceLinkedRoleDeletionStatus
+                - iam:ListRoles
+                - iam:ListAttachedRolePolicies
+                - iam:ListRolePolicies
+                - iam:ListRoleTags
+                - iam:TagRole
+                - iam:UntagRole
+                - iam:CreateServiceLinkedRole
+                - iam:CreateRole
+                - iam:DeleteServiceLinkedRole
+                - iam:DeleteRole
+                - iam:UpdateRole
+                - iam:AttachRolePolicy
+                - iam:PutRolePolicy
+                - iam:DeleteRolePolicy
+                - iam:DetachRolePolicy
+                - iam:UpdateRoleDescription
+                - iam:UpdateAssumeRolePolicy
+                - sns:Publish
+                - ecs:RegisterTaskDefinition
+                - ecs:DescribeTaskDefinition
+                - ecs:ListTaskDefinitions
+                - ecs:ListTagsForResource
+                - ecs:UntagResource
+                - ecs:TagResource
+                - ecs:ListTaskDefinitionFamilies
+                - ecs:DeregisterTaskDefinition
+                - sqs:UntagQueue
+                - sqs:TagQueue
+                - sqs:DeleteQueue
+                - sqs:SetQueueAttributes
+                - sqs:CreateQueue
+                - sqs:ChangeMessageVisibility
+                - sqs:ListQueues
+                - sqs:GetQueueUrl
+                - sqs:ListQueueTags
+                - sqs:RemovePermission
+                - sqs:AddPermission
+                - sqs:GetQueueAttributes
+                - sqs:ListDeadLetterSourceQueues
+                - ec2:DeleteSecurityGroup
+                - ec2:CreateSecurityGroup
+                - ec2:DescribeSecurityGroups
+                - ec2:CreateTags
+                - ec2:DeleteTags
+              Effect: Allow
+              Resource: '*'
+            - Action:
+                - iam:PassRole
+              Effect: Allow
+              Resource: "*"
+              Condition:
+                ForAnyValue:StringLike:
+                  iam:AssociatedResourceARN:
+                    - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
+                    - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*
+                    - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:AttiniDeploymentPlanSfn*
+            - Action:
+                - iam:PassRole
+              Effect: Allow
+              Resource:
+                !If
+                  - AwsServiceRolesContainsString
+                  - "*"
+                  - - !Sub arn:aws:iam::${AWS::AccountId}:role/*${AwsServiceRolesContainsString}*
+                    - !Sub arn:aws:iam::${AWS::AccountId}:role/*/*${AwsServiceRolesContainsString}*
+
+
+  AttiniInitDeploymentPolicy:
+    Type: AWS::IAM::Policy
+    Condition: AttachLeastPrivilegePolicyToInitDeployRole
+    Properties:
+      PolicyName: !Sub attini-init-deploy-least-privilege-policy-${AWS::Region}
+      Roles:
+        !If
+          - UseDefaultRoleForInitDeploy
+          - - !Ref AttiniInitDeployLambdaServiceRole
+          - - !GetAtt ConfigurationMutationsV1.InitDeployRoleName
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Action:
+            - s3:GetObject*
+            - s3:PutObject*
+            - s3:DeleteObject*
+            - s3:ListBucket
+            - s3:ListBucketVersions
+          Effect: Allow
+          Resource:
+            - !Sub  arn:aws:s3:::attini-deployment-origin-${AWS::Region}-${AWS::AccountId}
+            - !Sub  arn:aws:s3:::attini-deployment-origin-${AWS::Region}-${AWS::AccountId}/*
+            - !Sub  arn:aws:s3:::attini-artifact-store-${AWS::Region}-${AWS::AccountId}
+            - !Sub  arn:aws:s3:::attini-artifact-store-${AWS::Region}-${AWS::AccountId}/*
+        - Action:
+            - cloudformation:Describe*
+            - cloudformation:List*
+            - cloudformation:Get*
+            - cloudformation:ValidateTemplate
+          Effect: Allow
+          Resource: "*"
+        - Action:
+            - cloudformation:CreateStack
+            - cloudformation:TagResource
+            - cloudformation:UntagResource
+          Effect: Allow
+          Resource: "*"
+          Condition:
+            StringEquals:
+              aws:RequestTag/AttiniResourceType: init-deploy
+        - Action:
+            - cloudformation:CancelUpdateStack
+            - cloudformation:CreateChangeSet
+            - cloudformation:ContinueUpdateRollback
+            - cloudformation:UpdateStack
+            - cloudformation:DeleteStack
+            - cloudformation:TagResource
+            - cloudformation:UntagResource
+          Effect: Allow
+          Resource: "*"
+          Condition:
+            StringEquals:
+              aws:ResourceTag/AttiniResourceType: init-deploy
+        - Action:
+            - cloudformation:CreateChangeSet
+          Effect: Allow
+          Resource:
+            - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:transform/AttiniDeploymentPlan
+            - !Sub arn:aws:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31
+        - Action:
+            - lambda:InvokeFunction
+          Effect: Allow
+          Resource:
+            - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AttiniDeploymentPlanSetupFunction}
+            - !GetAtt AttiniStepGuardFunction.Arn
+        - Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:Query
+            - dynamodb:DeleteItem
+          Effect: Allow
+          Resource:
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AttiniDeployData*
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AttiniResourceStates*
+        - Action:
+            - sns:publish
+          Effect: Allow
+          Resource:
+            - !Ref AttiniRespondToInitDeployCfnEvent
+            - !Ref AttiniDeploymentStatus
+        - Action:
+            - ssm:PutParameter
+            - ssm:AddTagsToResource
+            - ssm:GetParameters
+          Effect: Allow
+          Resource:
+            - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/attini/*
+            - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cdk-bootstrap/*
+            - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/attini/*
+
+
+  AttiniInitDeployPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt AttiniInitDeployFunction.Arn
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub arn:aws:s3:::attini-deployment-origin-${AWS::Region}-${AWS::AccountId}
+
+
+  AttiniDeploymentOriginBucket:
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub attini-deployment-origin-${AWS::Region}-${AWS::AccountId}
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .zip
+            Function: !GetAtt AttiniInitDeployFunction.Arn
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: MultipartUploadLifecycleRule
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+          - Id: NoncurrentVersionExpirationInDays
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 30
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+
+  AttiniArtifactBucket:
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub attini-artifact-store-${AWS::Region}-${AWS::AccountId}
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: MultipartUploadLifecycleRule
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+          - Id: NoncurrentVersionExpirationInDays
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 30
+          - Id: TemporaryStorage
+            Status: Enabled
+            ExpirationInDays: 30
+            Prefix: attini/tmp/
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+
+  AttiniDeploymentPlanDefaultStatesServiceRole:
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Type: AWS::IAM::Role
+    Condition: CreateDeploymentPlanDefaultRole
+    Properties:
+      RoleName: !Sub attini-deployment-plan-default-role-${AWS::Region}
+      Path: /attini/
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-deployment-plan-default-role-inline-policy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:List*
+                  - lambda:Get*
+                  - lambda:InvokeAsync
+                  - lambda:InvokeFunction
+                  - ecs:Get*
+                  - ecs:Describe*
+                  - ecs:RunTask
+                  - codebuild:List*
+                  - codebuild:BatchGetReports
+                  - codebuild:RetryBuild
+                  - codebuild:BatchDeleteBuilds
+                  - codebuild:StopBuild
+                  - codebuild:StartBuildBatch
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                  - sns:ListTopics
+                  - sns:Publish
+                  - sqs:ListQueues
+                  - sqs:GetQueueUrl
+                  - sqs:GetQueueAttributes
+                  - sqs:SendMessageBatch
+                  - sqs:SendMessage
+                  - states:ListStateMachines
+                  - states:ListExecutions
+                  - states:Describe*
+                  - states:StartExecution
+                  - events:PutTargets
+                  - events:PutRule
+                  - events:DescribeRule
+                  - logs:CreateLogDelivery
+                  - logs:GetLogDelivery
+                  - logs:UpdateLogDelivery
+                  - logs:DeleteLogDelivery
+                  - logs:ListLogDeliveries
+                  - logs:PutResourcePolicy
+                  - logs:DescribeResourcePolicies
+                  - logs:DescribeLogGroups
+                Resource: "*"
+
+
+  AttiniDeploymentOriginTableV1:
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AttiniDeployDataV1
+      AttributeDefinitions:
+        - AttributeName: deploymentName
+          AttributeType: S
+        - AttributeName: distributionName
+          AttributeType: S
+        - AttributeName: distributionId
+          AttributeType: S
+        - AttributeName: deploymentTime
+          AttributeType: N
+        - AttributeName: eTag
+          AttributeType: S
+        - AttributeName: objectIdentifier
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: deploymentName
+          KeyType: HASH
+        - AttributeName: deploymentTime
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: distributionName
+          KeySchema:
+            - AttributeName: deploymentName
+              KeyType: HASH
+            - AttributeName: distributionName
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
+        - IndexName: deployId
+          KeySchema:
+            - AttributeName: deploymentName
+              KeyType: HASH
+            - AttributeName: distributionId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
+        - IndexName: eTag
+          KeySchema:
+            - AttributeName: deploymentName
+              KeyType: HASH
+            - AttributeName: eTag
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: objectIdentifier
+          KeySchema:
+            - AttributeName: deploymentName
+              KeyType: HASH
+            - AttributeName: objectIdentifier
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+
+  AttiniResourceStatesTableV1:
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AttiniResourceStatesV1
+      AttributeDefinitions:
+        - AttributeName: resourceType
+          AttributeType: S
+        - AttributeName: name
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: resourceType
+          KeyType: HASH
+        - AttributeName: name
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+  AttiniResourceGroup:
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Condition: ResourceGroupsSupported
+    Type: AWS::ResourceGroups::Group
+    Properties:
+      Description: Resource group that conitains all resources created for the attini setup
+      Name: attini-setup
+      ResourceQuery:
+        Query:
+          StackIdentifier: !Ref AWS::StackId
+        Type: CLOUDFORMATION_STACK_1_0
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+
+  AttiniAutoUpdateFunction:
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Condition: UseAutoUpdate
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: attini-auto-update
+      Handler: auto-update.lambda_handler
+      Runtime: python3.9
+      MemorySize: 128
+      Role: !GetAtt AttiniAutoUpdateLambdaServiceRole.Arn
+      CodeUri: auto-update/
+      CodeSigningConfigArn:
+        !If
+          - CodeSigningSupported
+          - !GetAtt AttiniCodeSigningConfig.CodeSigningConfigArn
+          - !Ref AWS::NoValue
+      ReservedConcurrentExecutions:
+        !If
+          - ResourceAllocation
+          - !Ref AWS::NoValue
+          - 1
+      Environment:
+        Variables:
+          STACK_NAME: !Ref AWS::StackName
+          TEMPLATE_URL: !Sub https://attini-artifacts-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/attini-setup/latest/attini-setup.yaml
+      Events:
+        AttiniUpdateTrigger:
+          Type: Schedule
+          Properties:
+            Description: Auto updates the attini framework
+            Enabled: True
+            Schedule: !Sub '${AutoUpdate}'
+
+
+  AttiniAutoUpdateLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Condition: UseAutoUpdate
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AttiniAutoUpdateFunction}
+      RetentionInDays: 30
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+
+  AttiniAutoUpdateLambdaServiceRole:
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub attini-auto-update-lambda-role-${AWS::Region}
+      Path: /attini/
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - !Ref AttiniAutoUpdatePolicy
+
+
+  AttiniAutoUpdatePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub attini-update-policy-${AWS::Region}
+      Description: This policy contains the permissions to update the attini setup cloudformation stack.
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - cloudformation:GetTemplateSummary
+              - cloudformation:CreateChangeSet
+              - events:DescribeRule
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - cloudformation:DescribeStacks
+            Effect: Allow
+            Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/attini-setup/*
+          - Action:
+              - cloudformation:UpdateStack
+            Effect: Allow
+            Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/attini-setup/*
+            Condition:
+              ForAnyValue:StringLike:
+                cloudformation:TemplateUrl:
+                  - !Sub https://s3.amazonaws.com/attini-artifacts-${AWS::Region}/attini-setup/*
+                  - !Sub https://attini-artifacts-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/attini-setup/*
+                  - !Sub https://s3.amazonaws.com/acc-attini-artifacts-${AWS::Region}/attini-setup/*
+                  - !Sub https://acc-attini-artifacts-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/attini-setup/*
+          - Action:
+              - dynamodb:*
+            Effect: Allow
+            Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Attini*
+          - Action:
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:PutItem
+              - dynamodb:GetItem
+              - dynamodb:BatchGetItem
+              - dynamodb:ConditionCheckItem
+              - dynamodb:BatchWriteItem
+            Effect: Deny
+            Resource: "*"
+          - Action:
+              - resource-groups:*
+            Effect: Allow
+            Resource: !Sub arn:aws:resource-groups:${AWS::Region}:${AWS::AccountId}:group/attini-setup
+          - Action:
+              - logs:*
+            Effect: Allow
+            Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/attini-*
+          - Action:
+              - iam:*
+            Effect: Allow
+            Resource:
+            - !Sub arn:aws:iam::${AWS::AccountId}:role/attini/*
+            - !Sub arn:aws:iam::${AWS::AccountId}:policy/attini-*
+          - Action:
+              - iam:GetRole
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - iam:PassRole
+            Effect: Allow
+            Resource: "*"
+            Condition:
+              StringEquals:
+                iam:PassedToService: cloudformation.amazonaws.com
+              StringLike:
+                iam:AssociatedResourceARN:
+                - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/attini-setup/*
+          - Action:
+              - lambda:*
+            Effect: Allow
+            Resource:
+            - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:attini-*
+            - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:code-signing-config:*
+          - Action:
+              - lambda:GetCodeSigningConfig
+              - lambda:CreateCodeSigningConfig
+              - lambda:UpdateCodeSigningConfig
+              - lambda:DeleteCodeSigningConfig
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - sns:*
+            Effect: Allow
+            Resource:
+            - !Sub  arn:aws:sns:${AWS::Region}:${AWS::AccountId}:attini-*
+          - Action:
+              - s3:*
+            Effect: Allow
+            Resource:
+              - !Sub arn:aws:s3:::attini-*
+              - !Sub arn:aws:s3:::acc-attini-*
+          - Action:
+              - s3:PutObject*
+              - s3:DeleteObject*
+            Effect: Deny
+            Resource:
+            - !Sub arn:aws:s3:::attini-*
+          - !If
+              - CustomNetwork
+              - Action:
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DeleteSecurityGroup
+                  - ec2:CreateSecurityGroup
+                Effect: Allow
+                Resource:
+                - !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/*
+              - !Ref AWS::NoValue
+          - Action:
+              - ecs:ListClusters
+              - ecs:DescribeClusters
+              - ecs:ListTaskDefinitions
+              - ecs:ListTaskDefinitionFamilies
+              - ecs:DescribeTaskDefinition
+              - ecs:ListTagsForResource
+              - ecs:RegisterTaskDefinition
+              - ecs:DeregisterTaskDefinition
+              - ecs:CreateCluster
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - ecs:TagResource
+              - ecs:UntagResource
+              - ecs:UpdateCluster
+              - ecs:DeleteCluster
+            Effect: Allow
+            Resource:
+              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/attini-default
+              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/attini-default-runner:*
+
+  AttiniDenyPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      ManagedPolicyName: !Sub attini-deny-policy-${AWS::Region}
+      Description: This policy denys your users or roles to tamper with attini resources. Apply this policy to anyone that is not administrator in you accounts
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - cloudformation:*
+              - dynamodb:*
+              - iam:*
+              - lambda:*
+              - sns:*
+            Effect: Deny
+            Resource:
+              - !Sub arn:aws:cloudformation:*:${AWS::AccountId}:stack/attini-setup/*
+              - !Sub arn:aws:dynamodb:*:${AWS::AccountId}:table/Attini*
+              - !Sub arn:aws:iam::${AWS::AccountId}:role/attini/*
+              - !Sub arn:aws:iam::${AWS::AccountId}:policy/attini-*
+              - !Sub arn:aws:lambda:*:${AWS::AccountId}:function:attini-*
+              - !Sub arn:aws:sns:*:${AWS::AccountId}:attini-*
+          - Action:
+              - s3:DeleteBucketPolicy
+              - s3:DeleteAccessPointPolicy
+              - s3:PutBucketAcl
+              - s3:PutBucketPolicy
+              - s3:PutBucketPublicAccessBlock
+            Effect: Deny
+            Resource:
+              - !Sub arn:aws:s3:::attini-artifact-store-*
+              - !Sub arn:aws:s3:::attini-deployment-origin-*
+          - Action:
+              - logs:DeleteLogGroup
+              - logs:DeleteLogStream
+            Effect: Deny
+            Resource:
+              - !Sub arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/attini-*
+          - Action:
+              - resource-groups:Delete*
+              - resource-groups:Put*
+              - resource-groups:Update*
+              - resource-groups:UngroupResources
+              - resource-groups:GroupResources
+            Effect: Deny
+            Resource:
+              - !Sub arn:aws:resource-groups:*:${AWS::AccountId}:group/attini-setup
+
+  AttiniRunnerBasicExecutionPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      ManagedPolicyName: !Sub attini-runner-basic-execution-policy-${AWS::Region}
+      Description: This is a least privilege policy for the Attini runner.
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Sub arn:aws:s3:::attini-artifact-store-${AWS::Region}-${AWS::AccountId}/*
+              - !Sub arn:aws:s3:::attini-artifact-store-${AWS::Region}-${AWS::AccountId}
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource:
+              - !Sub arn:aws:s3:::attini-artifact-store-${AWS::Region}-${AWS::AccountId}/attini/deployment/*
+          - Effect: Allow
+            Action:
+              - sqs:GetQueueAttributes
+              - sqs:DeleteMessage
+              - sqs:ReceiveMessage
+            Resource: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:*AttiniRunnerQueue*
+          - Effect: Allow
+            Action:
+              - states:SendTaskSuccess
+              - states:SendTaskFailure
+            Resource:
+              - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:AttiniDeploymentPlanSfn*
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:Query
+              - dynamodb:UpdateItem
+              - dynamodb:PutItem
+            Resource:
+              - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AttiniDeployData*
+              - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AttiniResourceStates*
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:attini-step-guard
+
+  AttiniCliUser:
+    Type: AWS::IAM::ManagedPolicy
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      ManagedPolicyName: !Sub attini-cli-user-${AWS::Region}
+      Description: This policy allows users to use the Attini cli
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObject*
+              - s3:ListBucket
+              - s3:GetObject
+            Resource:
+              - !Sub arn:aws:s3:::attini-deployment-origin-*/*
+              - !Sub arn:aws:s3:::attini-deployment-origin-*
+              - !Sub arn:aws:s3:::attini-artifact-store-*/*
+              - !Sub arn:aws:s3:::attini-artifact-store-*
+          - Effect: Allow
+            Action:
+              - s3:ListAllMyBuckets
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - cloudformation:Describe*
+              - cloudformation:List*
+              - states:List*
+              - states:Describe*
+              - states:Get*
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:Query
+            Resource:
+              - !Sub arn:aws:dynamodb:*:${AWS::AccountId}:table/AttiniDeployData*
+              - !Sub arn:aws:dynamodb:*:${AWS::AccountId}:table/AttiniResourceState*
+
+  AttiniDefaultEcsCluster:
+    Type: AWS::ECS::Cluster
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      ClusterName: attini-default
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+  RunnerDefaultTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      ContainerDefinitions:
+        - Name: attini-default-container
+          Image: public.ecr.aws/attini/default-runner:attini-default-runner-1.0.6
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AttiniDefaultRunnerLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: logs
+          Environment:
+            - Name: SAM_CLI_TELEMETRY
+              Value: 0
+      Cpu: 512
+      ExecutionRoleArn: !GetAtt AttiniDefaultRunnerRole.Arn
+      Family: attini-default-runner
+      Memory: 3072
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      TaskRoleArn: !GetAtt AttiniDefaultRunnerRole.Arn
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+  AttiniDefaultRunnerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      LogGroupName: /attini/runner/default
+      RetentionInDays: 90
+      Tags:
+        - Key: Attini
+          Value: "-"
+
+  AttiniDefaultRunnerRole:
+    Type: AWS::IAM::Role
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      RoleName: !Sub attini-default-runner-role-${AWS::Region}
+      Path: /attini/
+      Tags:
+        - Key: Attini
+          Value: "-"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        !If
+          - GiveAdminAccess
+          - - arn:aws:iam::aws:policy/AdministratorAccess
+          - - !Ref AttiniRunnerBasicExecutionPolicy
+            - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        !If
+          - GiveAdminAccess
+          - !Ref AWS::NoValue
+          - - PolicyName: !Sub ${AWS::StackName}-default-runner-inline-policy
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - s3:PutObject
+                    Resource:
+                      - !Sub arn:aws:s3:::attini-artifact-store-${AWS::Region}-${AWS::AccountId}/*/.sam-source/*
+
+
+Outputs:
+  AttiniSetupVersion:
+    Description: The version of the Attini framework
+    Value: 0.0.0

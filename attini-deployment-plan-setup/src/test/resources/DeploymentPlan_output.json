@@ -1,0 +1,226 @@
+{
+  "accountId": "655047308345",
+  "fragment": {
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Attini init deploy stack for distribution: platform",
+    "Parameters": {
+      "EnvironmentName": {
+        "Type": "String",
+        "Default": "dev"
+      },
+      "AttiniDistributionName": {
+        "Type": "String"
+      },
+      "AttiniDistributionId": {
+        "Type": "String"
+      },
+      "Test": {
+        "Type": "String"
+      },
+      "Container": {
+        "Type": "String"
+      }
+    },
+    "Outputs": {
+      "Container": {
+        "Value": {
+          "Ref": "Container"
+        }
+      },
+      "Test": {
+        "Value": {
+          "Ref": "Test"
+        }
+      }
+    },
+    "Resources": {
+      "AttiniDeploymentPlanSfnMyDeploymentPlanTrigger": {
+        "Type": "Custom::AttiniDeploymentPlanTrigger",
+        "Properties": {
+          "ServiceToken": {
+            "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:attini-deployment-plan-setup"
+          },
+          "SfnName": {
+            "Fn::GetAtt": "AttiniDeploymentPlanSfnMyDeploymentPlan.Name"
+          },
+          "SfnArn": {
+            "Ref": "AttiniDeploymentPlanSfnMyDeploymentPlan"
+          },
+          "DeploymentPlanLogicalName": "AttiniDeploymentPlanSfnMyDeploymentPlan",
+          "StackName": {
+            "Ref": "AWS::StackName"
+          },
+          "Runners": []
+        }
+      },
+      "AttiniPostExecutionActionsMyDeploymentPlan": {
+        "Properties": {
+          "Description": "Attini deployment plan post hook",
+          "EventPattern": {
+            "Fn::Sub": "{\"source\": [\"aws.states\"],\"detail-type\": [\"Step Functions Execution Status Change\"],\"detail\": {\"stateMachineArn\": [ \"${AttiniDeploymentPlanSfnMyDeploymentPlan}\"],\"status\": [\"FAILED\",\"SUCCEEDED\",\"ABORTED\",\"TIMED_OUT\"]}}"
+          },
+          "Targets": [
+            {
+              "Arn": {
+                "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:attini-action"
+              },
+              "Id": "post-execution-actions"
+            }
+          ]
+        },
+        "Type": "AWS::Events::Rule"
+      },
+      "AttiniDeploymentPlanSfnMyDeploymentPlan": {
+        "Type": "AWS::Serverless::StateMachine",
+        "Metadata": {
+          "AttiniSteps": [
+            "DeployCfn",
+            "InvokeLambda"
+          ]
+        },
+        "Properties": {
+          "Role": "arn:aws:iam::655047308345:role/attini/attini-action-lambda-service-role-eu-west-1",
+          "Definition": {
+            "StartAt": "GetDeployData",
+            "States": {
+              "GetDeployData": {
+                "Type": "Task",
+                "Resource": {
+                  "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:attini-action"
+                },
+                "Parameters": {
+                  "customData.$": "$",
+                  "attiniActionType": "GetDeployOriginData",
+                  "sfnArn.$": "$$.StateMachine.Id",
+                  "executionArn.$": "$$.Execution.Id"
+                },
+                "ResultPath": "$",
+                "Next": "InitLambda"
+              },
+              "InitLambda": {
+                "Type": "Task",
+                "Resource": "arn:aws:lambda:eu-west-1:855066048591:function:dev-lambda-test",
+                "TimeoutSeconds": 300,
+                "Next": "DeployCfn"
+              },
+              "DeployCfn": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+                "Parameters": {
+                  "FunctionName": "attini-action",
+                  "Payload": {
+                    "customData.$": "$.customData",
+                    "deploymentOriginData.$": "$.deploymentOriginData",
+                    "attiniActionType": "DeployCfn",
+                    "CfnConfig": {
+                      "RoleArn": {
+                        "Fn::GetAtt": "LambdaServiceRole.Arn"
+                      },
+                      "Template": "lambda.yaml",
+                      "StackName": "MyFirstLambda"
+                    },
+                    "deploymentPlanExecutionMetadata": {
+                      "executionArn.$": "$$.Execution.Id",
+                      "retryCounter.$": "$$.State.RetryCount",
+                      "executionStartTime.$": "$$.Execution.StartTime",
+                      "sfnToken.$": "$$.Task.Token",
+                      "stepName.$": "$$.State.Name"
+                    },
+                    "output.$": "$.output",
+                    "dependencies.$": "$.dependencies"
+                  }
+                },
+                "Retry": [
+                  {
+                    "ErrorEquals": [
+                      "IsExecuting"
+                    ],
+                    "IntervalSeconds": 3,
+                    "MaxAttempts": 650,
+                    "BackoffRate": 1.01
+                  },
+                  {
+                    "ErrorEquals": [
+                      "RollBackCompleteState"
+                    ],
+                    "IntervalSeconds": 4,
+                    "MaxAttempts": 1,
+                    "BackoffRate": 1
+                  },
+                  {
+                    "BackoffRate": 1.2,
+                    "ErrorEquals": [
+                      "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 30
+                  }
+                ],
+                "Next": "InvokeLambda"
+              },
+              "InvokeLambda": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "InputPath": "$",
+                "ResultPath": "$.output.InvokeLambda",
+                "OutputPath": "$",
+                "ResultSelector": {
+                  "result.$": "$.Payload"
+                },
+                "Parameters": {
+                  "FunctionName": "my-function",
+                  "Payload.$" : "$"
+                },
+                "Next": "Vpc"
+              },
+              "Vpc": {
+                "Type": "Task",
+                "Resource": "arn:aws:lambda:eu-west-1:855066048591:function:dev-lambda-test",
+                "TimeoutSeconds": 300,
+                "Next": "SuccessState"
+              },
+              "SuccessState": {
+                "Type": "Succeed"
+              }
+            }
+          },
+          "Tags": {
+            "AttiniProvider": "DeploymentPlan"
+          }
+        }
+      },
+      "LambdaServiceRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "AssumeRolePolicyDocument": {
+            "Statement": [
+              {
+                "Action": "sts:AssumeRole",
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "cloudformation.amazonaws.com"
+                }
+              }
+            ],
+            "Version": "2012-10-17"
+          },
+          "ManagedPolicyArns": [
+            "arn:aws:iam::aws:policy/AdministratorAccess"
+          ]
+        }
+      }
+    }
+  },
+  "transformId": "655047308345::AttiniDeploymentPlan",
+  "requestId": "a57ac857-6940-4520-98c2-a93078e88d0c",
+  "region": "eu-west-1",
+  "params": {},
+  "templateParameterValues": {
+    "AttiniDistributionId": "79852f8a-0107-43ed-a6ce-45b5cdeeb288",
+    "Container": "12344",
+    "EnvironmentName": "dev",
+    "Test": "test",
+    "AttiniDistributionName": "platform"
+  },
+  "status": "success"
+}

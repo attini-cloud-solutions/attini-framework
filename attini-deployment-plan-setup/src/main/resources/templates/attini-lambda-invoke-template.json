@@ -1,0 +1,10 @@
+{
+  "Type": "Task",
+  "Resource": "arn:aws:states:::lambda:invoke",
+  "InputPath": "$",
+  "ResultPath": "$.output.CallLambda",
+  "OutputPath": "$",
+  "ResultSelector": {
+    "result.$": "$.Payload"
+  }
+}
