@@ -11,7 +11,10 @@ and CLI, find more information in the [getting started](https://attini.io/guides
 
 ## Compile and deploy the framework
 
-Attini is an AWS SAM Application written in Java with Quarkus. 
+Attini is an AWS SAM Application written in Java and built with Quarkus. 
+The separate Lambda functions are intended to be compiled in to standalone
+executables, using GraalVM Native image. 
+
 
 To deploy and test the framework, you will need AWS CLI Credentials and AWS SAM CLI.
 
