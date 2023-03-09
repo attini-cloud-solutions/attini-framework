@@ -1,10 +1,12 @@
 package deployment.plan.bean.config;
 
+import java.net.URI;
+import java.time.Duration;
 import javax.enterprise.context.ApplicationScoped;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import deployment.plan.AwsClientSingletonFactory;
+import attini.domain.CustomAwsClient;
 import deployment.plan.custom.resource.CfnResponseSender;
 import deployment.plan.custom.resource.CustomResourceHandler;
 import deployment.plan.custom.resource.service.DeployStatesFacade;
@@ -17,6 +19,14 @@ import deployment.plan.transform.DeploymentPlanStepsCreator;
 import deployment.plan.transform.TemplateFileLoader;
 import deployment.plan.transform.TemplateFileLoaderImpl;
 import deployment.plan.transform.TransformDeploymentPlanCloudFormation;
+import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
+import software.amazon.awssdk.core.retry.RetryPolicy;
+import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.cloudformation.CloudFormationClient;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.ec2.Ec2Client;
 
 public class BeanConfig {
 
@@ -53,16 +63,25 @@ public class BeanConfig {
     public TransformDeploymentPlanCloudFormation transformDeploymentPlanCloudFormation(EnvironmentVariables environmentVariables,
                                                                                        ObjectMapper objectMapper,
                                                                                        DeploymentPlanStepsCreator deploymentPlanStepsCreator) {
+
+        Ec2Client ec2Client = Ec2Client.builder()
+                                 .region(Region.of(environmentVariables.getRegion()))
+                                 .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                                 .overrideConfiguration(createClientOverrideConfiguration())
+                                 .httpClient(UrlConnectionHttpClient.builder().build())
+                                 .endpointOverride(getAwsServiceEndpoint("ec2", environmentVariables.getRegion()))
+                                 .build();
         return new TransformDeploymentPlanCloudFormation(environmentVariables,
-                                                         AwsClientSingletonFactory.getEc2Client(),
+                                                         ec2Client,
                                                          objectMapper,
                                                          deploymentPlanStepsCreator);
     }
 
     @ApplicationScoped
-    DeployStatesFacade deployStatesFacade(EnvironmentVariables environmentVariables, ObjectMapper objectMapper) {
-        return new DeployStatesFacade(
-                AwsClientSingletonFactory.getDynamoDbClient(), environmentVariables, objectMapper);
+    DeployStatesFacade deployStatesFacade(EnvironmentVariables environmentVariables,
+                                          ObjectMapper objectMapper,
+                                          @CustomAwsClient DynamoDbClient dynamoDbClient) {
+        return new DeployStatesFacade(dynamoDbClient, environmentVariables, objectMapper);
     }
 
     @ApplicationScoped
@@ -72,8 +91,35 @@ public class BeanConfig {
 
 
     @ApplicationScoped
-    RegisterDeployOriginDataService registerDeployOriginDataService(DeployStatesFacade deployStatesFacade) {
-        return new RegisterDeployOriginDataService(deployStatesFacade, AwsClientSingletonFactory.getCfnClient());
+    RegisterDeployOriginDataService registerDeployOriginDataService(DeployStatesFacade deployStatesFacade,
+                                                                    @CustomAwsClient CloudFormationClient cloudFormationClient) {
+        return new RegisterDeployOriginDataService(deployStatesFacade, cloudFormationClient);
+    }
+
+
+    @ApplicationScoped
+    @CustomAwsClient
+    public DynamoDbClient dynamoDbClient(EnvironmentVariables environmentVariables) {
+        return DynamoDbClient.builder()
+                             .region(Region.of(environmentVariables.getRegion()))
+                             .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                             .overrideConfiguration(createClientOverrideConfiguration())
+                             .httpClient(UrlConnectionHttpClient.builder().build())
+                             .endpointOverride(getAwsServiceEndpoint("dynamodb", environmentVariables.getRegion()))
+                             .build();
+    }
+
+    @ApplicationScoped
+    @CustomAwsClient
+    public CloudFormationClient cloudFormationClient(EnvironmentVariables environmentVariables) {
+        return CloudFormationClient.builder()
+                                   .region(Region.of(environmentVariables.getRegion()))
+                                   .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                                   .overrideConfiguration(createClientOverrideConfiguration())
+                                   .httpClient(UrlConnectionHttpClient.builder().build())
+                                   .endpointOverride(getAwsServiceEndpoint("cloudFormation",
+                                                                           environmentVariables.getRegion()))
+                                   .build();
     }
 
     @ApplicationScoped
@@ -86,6 +132,21 @@ public class BeanConfig {
                                          registerDeployOriginDataService,
                                          new CfnResponseSender(),
                                          objectMapper);
+    }
+
+    private static ClientOverrideConfiguration createClientOverrideConfiguration() {
+
+        return ClientOverrideConfiguration.builder()
+                                          .apiCallTimeout(Duration.ofSeconds(240))
+                                          .apiCallAttemptTimeout(Duration.ofSeconds(30))
+                                          .retryPolicy(RetryPolicy.builder()
+                                                                  .numRetries(20)
+                                                                  .build())
+                                          .build();
+    }
+
+    private static URI getAwsServiceEndpoint(String service, String environment) {
+        return URI.create(String.format("https://%s.%s.amazonaws.com", service, environment));
     }
 
 }
