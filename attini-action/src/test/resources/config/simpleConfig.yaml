@@ -1,0 +1,5 @@
+template: my/path
+parameters:
+  Ram: 128
+tags:
+  Author: Oscar

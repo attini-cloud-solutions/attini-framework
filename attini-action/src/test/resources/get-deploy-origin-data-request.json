@@ -1,0 +1,6 @@
+{
+  "attiniActionType": "GetDeployOriginData",
+  "sfnArn": "arn:aws:states:eu-west-1:655047308345:stateMachine:PipelineAttiniDeploymentPlanSfn-JrVqujOxtZcG",
+  "customData": {},
+  "executionArn": "arn:aws:states:eu-west-1:655047308345:execution:PipelineAttiniDeploymentPlanSfn-JrVqujOxtZcG:029f4270-dc5c-4f13-83d0-4f68d1bdebda"
+}

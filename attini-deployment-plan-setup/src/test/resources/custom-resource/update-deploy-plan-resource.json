@@ -1,0 +1,30 @@
+{
+  "RequestType": "Update",
+  "ServiceToken": "arn:aws:lambda:eu-west-1:655047308345:function:attini-deployment-plan-setup",
+  "ResponseURL": "https://cloudformation-custom-resource-response-euwest1.s3-eu-west-1.amazonaws.com/arn%3Aaws%3Acloudformation%3Aeu-west-1%3A655047308345%3Astack/dev-infra-init-deploy/7c5b7d00-750c-11eb-b6b9-0adfcf7776fd%7CPipelineAttiniDeploymentPlanSfnTrigger%7C9bf64a9b-b55d-4a2c-88f6-cae9305dd533?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20210223T111614Z&X-Amz-SignedHeaders=host&X-Amz-Expires=7200&X-Amz-Credential=AKIAJ7MCS7PVEUOADEEA%2F20210223%2Feu-west-1%2Fs3%2Faws4_request&X-Amz-Signature=199c7e06add10383beb44f0543ea7b5129e9dc22942e274aeb6a7403acf16e01",
+  "StackId": "arn:aws:cloudformation:eu-west-1:655047308345:stack/dev-infra-init-deploy/7c5b7d00-750c-11eb-b6b9-0adfcf7776fd",
+  "RequestId": "9bf64a9b-b55d-4a2c-88f6-cae9305dd533",
+  "LogicalResourceId": "PipelineAttiniDeploymentPlanSfnTrigger",
+  "PhysicalResourceId": "DeploymentPlan",
+  "ResourceType": "Custom::AttiniDeploymentPlanTrigger",
+  "ResourceProperties": {
+    "SfnName": "PipelineAttiniDeploymentPlanSfn-JrVqujOxtZcG",
+    "SfnArn": "arn:aws:states:eu-west-1:655047308345:stateMachine:PipelineAttiniDeploymentPlanSfn-JrVqujOxtZcG",
+    "ServiceToken": "arn:aws:lambda:eu-west-1:655047308345:function:attini-deployment-plan-setup",
+    "AttiniSetupVersion": {
+      "version": "0.0.1"
+    },
+    "RandomGUID": "e2a73ebe-a922-4402-9919-b7b50e88e6e6",
+    "StackName": "dev-infra-init-deploy"
+  },
+  "OldResourceProperties": {
+    "SfnName": "PipelineAttiniDeploymentPlanSfn-JrVqujOxtZcG",
+    "SfnArn": "arn:aws:states:eu-west-1:655047308345:stateMachine:PipelineAttiniDeploymentPlanSfn-JrVqujOxtZcG",
+    "ServiceToken": "arn:aws:lambda:eu-west-1:655047308345:function:attini-deployment-plan-setup",
+    "AttiniSetupVersion": {
+      "version": "0.0.1"
+    },
+    "RandomGUID": "988ad204-1bed-4f4a-aafe-a507a1cd3c88",
+    "StackName": "dev-infra-init-deploy"
+  }
+}

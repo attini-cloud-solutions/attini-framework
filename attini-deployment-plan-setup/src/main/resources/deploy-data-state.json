@@ -1,0 +1,16 @@
+{
+  "Type": "Task",
+  "Resource": {
+    "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:attini-action"
+  },
+  "Parameters": {
+    "Input.$": "$",
+    "attiniActionType": "GetDeployOriginData",
+    "AttiniDeployOriginData": {
+      "Environment": "dev",
+      "DeployName": "platform"
+    }
+  },
+  "ResultPath": "$",
+  "Next": "{nextStep}"
+}

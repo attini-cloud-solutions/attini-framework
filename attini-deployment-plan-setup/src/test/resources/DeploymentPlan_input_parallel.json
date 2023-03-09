@@ -1,0 +1,155 @@
+{
+  "accountId": "655047308345",
+  "fragment": {
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+      "EnvironmentName": {
+        "Type": "String",
+        "Default": "dev"
+      },
+      "AttiniDistributionName": {
+        "Type": "String"
+      },
+      "AttiniDistributionId": {
+        "Type": "String"
+      },
+      "Test": {
+        "Type": "String"
+      },
+      "Container": {
+        "Type": "String"
+      }
+    },
+    "Outputs": {
+      "Container": {
+        "Value": {
+          "Ref": "Container"
+        }
+      },
+      "Test": {
+        "Value": {
+          "Ref": "Test"
+        }
+      }
+    },
+    "Resources": {
+      "MyDeploymentPlan": {
+        "Type": "Attini::Deploy::DeploymentPlan",
+        "Properties": {
+          "RoleArn" : "arn:aws:iam::655047308345:role/attini/attini-action-lambda-service-role-eu-west-1",
+          "DeploymentPlan": {
+            "StartAt": "DeployMessageQueue",
+            "States": {
+              "DeployMessageQueue": {
+                "Type": "AttiniCfn",
+                "Properties": {
+                  "Template": "sqs.yaml",
+                  "StackName": null
+                },
+                "Next": "DeloyParallel"
+
+              },
+              "DeloyParallel": {
+                "Type": "Parallel",
+                "Next": "TriggerLambdas",
+                "Branches": [
+                  {
+                    "StartAt": "DeploySocksInventory",
+                    "States": {
+                      "DeploySocksInventory": {
+                        "Type": "AttiniCfn",
+                        "Properties" : {
+                          "Template": "socksInventory.yaml",
+                          "StackName": null
+                        },
+                        "End": true
+                      }
+                    }
+                  },
+                  {
+                    "StartAt": "DeployAuditLog",
+                    "States": {
+                      "DeployAuditLog": {
+                        "Type": "AttiniCfn",
+                        "Properties": {
+                          "Template": "auditLogEndpoint.yaml",
+                          "StackName": null
+                        },
+                        "End": true
+                      }
+                    }
+                  }
+                ]
+              },
+              "TriggerLambdas": {
+                "End": true,
+                "Type": "Parallel",
+                "Branches": [
+                  {
+                    "StartAt": "TriggerAuditLog",
+                    "States": {
+                      "TriggerAuditLog": {
+                        "Type": "Task",
+                        "Resource": "arn:aws:states:::lambda:invoke",
+                        "Parameters": {
+                          "FunctionName.$": null,
+                          "Payload.$": "$"
+                        },
+                        "End": true
+                      }
+                    }
+                  },
+                  {
+                    "StartAt": "TriggerSocksInventory",
+                    "States": {
+                      "TriggerSocksInventory": {
+                        "Type": "Task",
+                        "Resource": "arn:aws:states:::lambda:invoke",
+                        "Parameters": {
+                          "FunctionName.$": null,
+                          "Payload.$": "$"
+                        },
+                        "End": true
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "LambdaServiceRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "AssumeRolePolicyDocument": {
+            "Statement": [
+              {
+                "Action": "sts:AssumeRole",
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "cloudformation.amazonaws.com"
+                }
+              }
+            ],
+            "Version": "2012-10-17"
+          },
+          "ManagedPolicyArns": [
+            "arn:aws:iam::aws:policy/AdministratorAccess"
+          ]
+        }
+      }
+    }
+  },
+  "transformId": "655047308345::AttiniDeploymentPlan",
+  "requestId": "a57ac857-6940-4520-98c2-a93078e88d0c",
+  "region": "eu-west-1",
+  "params": {},
+  "templateParameterValues": {
+    "AttiniDistributionId": "79852f8a-0107-43ed-a6ce-45b5cdeeb288",
+    "Container": "12344",
+    "EnvironmentName": "dev",
+    "Test": "test",
+    "AttiniDistributionName": "platform"
+  }
+}

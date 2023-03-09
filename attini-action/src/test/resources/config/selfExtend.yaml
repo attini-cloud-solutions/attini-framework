@@ -1,0 +1,4 @@
+extends: /selfExtend.yaml
+template: my/path
+parameters:
+  Ram: 128

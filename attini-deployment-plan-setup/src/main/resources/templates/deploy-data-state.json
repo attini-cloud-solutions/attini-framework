@@ -1,0 +1,13 @@
+{
+  "Type": "Task",
+  "Resource": {
+    "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:attini-action"
+  },
+  "Parameters": {
+    "customData.$": "$",
+    "attiniActionType": "GetDeployOriginData",
+    "sfnArn.$": "$$.StateMachine.Id",
+    "executionArn.$": "$$.Execution.Id"
+  },
+  "ResultPath": "$"
+}

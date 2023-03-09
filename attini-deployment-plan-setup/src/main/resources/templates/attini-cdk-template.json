@@ -1,0 +1,33 @@
+{
+  "Type": "Task",
+  "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+  "Parameters": {
+    "FunctionName": "attini-action",
+    "Payload": {
+      "customData.$": "$.customData",
+      "deploymentOriginData.$": "$.deploymentOriginData",
+      "output.$": "$.output",
+      "dependencies.$": "$.dependencies",
+      "environment.$": "$.environment",
+      "stackParameters.$": "$.stackParameters",
+      "attiniActionType": "DeployCdk",
+      "deploymentPlanExecutionMetadata": {
+        "executionArn.$": "$$.Execution.Id",
+        "executionStartTime.$": "$$.Execution.StartTime",
+        "sfnToken.$": "$$.Task.Token",
+        "retryCounter.$": "$$.State.RetryCount",
+        "stepName.$": "$$.State.Name"
+      }
+    }
+  },
+"Retry": [
+    {
+      "ErrorEquals": [
+        "Lambda.TooManyRequestsException"
+      ],
+      "IntervalSeconds": 2,
+      "MaxAttempts": 30,
+      "BackoffRate": 1.2
+    }
+  ]
+}

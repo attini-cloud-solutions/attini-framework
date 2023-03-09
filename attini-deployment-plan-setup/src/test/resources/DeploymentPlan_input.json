@@ -1,0 +1,120 @@
+{
+  "accountId": "655047308345",
+  "fragment": {
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+      "EnvironmentName": {
+        "Type": "String",
+        "Default": "dev"
+      },
+      "AttiniDistributionName": {
+        "Type": "String"
+      },
+      "AttiniDistributionId": {
+        "Type": "String"
+      },
+      "Test": {
+        "Type": "String"
+      },
+      "Container": {
+        "Type": "String"
+      }
+    },
+    "Outputs": {
+      "Container": {
+        "Value": {
+          "Ref": "Container"
+        }
+      },
+      "Test": {
+        "Value": {
+          "Ref": "Test"
+        }
+      }
+    },
+    "Resources": {
+      "MyDeploymentPlan": {
+        "Type": "Attini::Deploy::DeploymentPlan",
+        "Properties": {
+          "DeploymentPlan": {
+            "StartAt": "InitLambda",
+            "States": {
+              "InitLambda": {
+                "Type": "Task",
+                "Resource": "arn:aws:lambda:eu-west-1:855066048591:function:dev-lambda-test",
+                "TimeoutSeconds": 300,
+                "Next": "SamStuff"
+              },
+              "SamStuff": {
+                "Type": "AttiniSam",
+                "Properties": {
+                  "Project": "/sam-test"
+                },
+                "Next": "DeployCfn"
+              },
+              "DeployCfn": {
+                "Type": "AttiniCfn",
+                "Properties" : {
+                  "Template": "lambda.yaml",
+                  "StackName": "MyFirstLambda",
+                  "RoleArn": {
+                    "Fn::GetAtt": "LambdaServiceRole.Arn"
+                  }
+                },
+                "Next": "InvokeLambda"
+              },
+              "InvokeLambda": {
+                  "Type": "AttiniLambdaInvoke",
+                  "Parameters": {
+                    "FunctionName" : "my-function"
+                  },
+                "Next" : "Vpc"
+              },
+
+              "Vpc": {
+                "Type": "Task",
+                "Resource": "arn:aws:lambda:eu-west-1:855066048591:function:dev-lambda-test",
+                "TimeoutSeconds": 300,
+                "Next": "SuccessState"
+              },
+              "SuccessState": {
+                "Type": "Succeed"
+              }
+            }
+          }
+        }
+      },
+      "LambdaServiceRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "AssumeRolePolicyDocument": {
+            "Statement": [
+              {
+                "Action": "sts:AssumeRole",
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "cloudformation.amazonaws.com"
+                }
+              }
+            ],
+            "Version": "2012-10-17"
+          },
+          "ManagedPolicyArns": [
+              "arn:aws:iam::aws:policy/AdministratorAccess"
+          ]
+        }
+      }
+    }
+  },
+  "transformId": "655047308345::AttiniDeploymentPlan",
+  "requestId": "a57ac857-6940-4520-98c2-a93078e88d0c",
+  "region": "eu-west-1",
+  "params": {},
+  "templateParameterValues": {
+    "AttiniDistributionId": "79852f8a-0107-43ed-a6ce-45b5cdeeb288",
+    "Container": "12344",
+    "EnvironmentName": "dev",
+    "Test": "test",
+    "AttiniDistributionName": "platform"
+  }
+}

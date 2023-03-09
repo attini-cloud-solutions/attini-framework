@@ -1,0 +1,4 @@
+extends: /parentConfig.yaml
+template: my/path
+parameters:
+  Ram: 128

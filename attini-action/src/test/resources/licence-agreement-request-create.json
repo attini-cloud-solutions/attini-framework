@@ -1,0 +1,14 @@
+{
+  "RequestType": "Create",
+  "ServiceToken": "arn:aws:lambda:eu-west-1:655047308345:function:attini-action",
+  "ResponseURL": "https://cloudformation-custom-resource-response-euwest1.s3-eu-west-1.amazonaws.com/arn%3Aaws%3Acloudformation%3Aeu-west-1%3A655047308345%3Astack/attini-setup/5e962240-3733-11ec-b0f3-0244f0c5d353%7CAcceptUserAgreement%7C1361bb69-24f1-4655-bafe-8429940d4071?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20211028T114824Z&X-Amz-SignedHeaders=host&X-Amz-Expires=7200&X-Amz-Credential=AKIAU7SEXKRMYJRGBAMF%2F20211028%2Feu-west-1%2Fs3%2Faws4_request&X-Amz-Signature=7aab4513f1c75dfe1db24090b3361d7a3dd5ae7ab9e5c612724e9362719b12fb",
+  "StackId": "arn:aws:cloudformation:eu-west-1:655047308345:stack/attini-setup/5e962240-3733-11ec-b0f3-0244f0c5d353",
+  "RequestId": "1361bb69-24f1-4655-bafe-8429940d4071",
+  "LogicalResourceId": "AcceptUserAgreement",
+  "ResourceType": "Custom::AcceptUserAgreement",
+  "ResourceProperties": {
+    "ServiceToken": "arn:aws:lambda:eu-west-1:655047308345:function:attini-action",
+    "Acceptance": "true",
+    "Region": "eu-west-1"
+  }
+}

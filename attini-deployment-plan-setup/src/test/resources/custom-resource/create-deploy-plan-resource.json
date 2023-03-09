@@ -1,0 +1,20 @@
+{
+  "RequestType": "Create",
+  "ServiceToken": "arn:aws:lambda:eu-west-1:316360690372:function:attini-pipeline",
+  "ResponseURL": "https://cloudformation-custom-resource-response-euwest1.s3-eu-west-1.amazonaws.com/arn%3Aaws%3Acloudformation%3Aeu-west-1%3A316360690372%3Astack/acc-attini-setup-init-deploy/5b706480-5bb6-11eb-9467-0ad624c96ae7%7CAttiniPipelineSfnAttiniSetupTrigger%7C75aad195-6e9c-4083-8fa4-f97974db845a?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20210223T065245Z&X-Amz-SignedHeaders=host&X-Amz-Expires=7199&X-Amz-Credential=AKIAJ7MCS7PVEUOADEEA%2F20210223%2Feu-west-1%2Fs3%2Faws4_request&X-Amz-Signature=ead72d6c28b068ad9649d0ada355952c6dd5b6f182f274e7227262a44615e784",
+  "StackId": "arn:aws:cloudformation:eu-west-1:316360690372:stack/acc-attini-setup-init-deploy/5b706480-5bb6-11eb-9467-0ad624c96ae7",
+  "RequestId": "75aad195-6e9c-4083-8fa4-f97974db845a",
+  "LogicalResourceId": "AttiniPipelineSfnAttiniSetupTrigger",
+  "PhysicalResourceId": "Pipeline",
+  "ResourceType": "Custom::AttiniDeploymentPlanTrigger",
+  "ResourceProperties": {
+    "SfnName": "AttiniPipelineSfnAttiniSetup-oD8yVH8yuHgO",
+    "SfnArn": "arn:aws:states:eu-west-1:316360690372:stateMachine:AttiniPipelineSfnAttiniSetup-oD8yVH8yuHgO",
+    "ServiceToken": "arn:aws:lambda:eu-west-1:316360690372:function:attini-pipeline",
+    "AttiniSetupVersion": {
+      "version": "0.0.1"
+    },
+    "RandomGUID": "d3ee59d4-b0d4-4f2f-9459-9f6eccb3d675",
+    "StackName": "acc-attini-setup-init-deploy"
+  }
+}

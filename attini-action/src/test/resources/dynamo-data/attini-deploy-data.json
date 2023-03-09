@@ -1,0 +1,20 @@
+{
+  "deploymentName":  "dev-infra",
+  "deploymentSource": {
+    "deploymentSourceBucket": "attini-artifact-store-eu-west-1-655047308345",
+    "deploymentSourcePrefix": "dev/infra/06496df7-194f-46e6-b250-c0c2a7fcf97d/distribution-origin"
+  },
+  "distributionTags": {
+    "branch": "hotfix/bugfix",
+    "version": "1.1.2"
+  },
+  "deploymentTime": 0,
+  "distributionId": "06496df7-194f-46e6-b250-c0c2a7fcf97d",
+  "distributionName": "infra",
+  "environment": "dev",
+  "objectIdentifier": "7413894bcd7ad3947e5be44ab66555c0",
+  "executionArns": [
+    "arn:aws:states:eu-west-1:655047308345:execution:PipelineAttiniDeploymentPlanSfn-JrVqujOxtZcG:03e10a98-86fe-466e-8f05-0e530779fe6e"
+  ],
+  "stackName": "dev-infra-init-deploy"
+}

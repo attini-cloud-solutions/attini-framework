@@ -1,0 +1,28 @@
+{
+  "distributionTags": {
+    "version": "1.1.2",
+    "branch": "hotfix/bugfix"
+  },
+  "initDeployConfig": {
+    "template": "pipeline.yaml",
+    "stackName": "${environment}-${distributionName}",
+    "parameters": {
+      "default": {
+        "Test": "test",
+        "Container": "Current"
+      },
+      "dev": {
+        "Container": "12344"
+      },
+      "dev1": {
+        "AttiniDefaultEnv": "dev",
+        "Container": "12344"
+      }
+    },
+    "tags": {
+      "dev": {
+        "Container": "12344"
+      }
+    }
+  }
+}
