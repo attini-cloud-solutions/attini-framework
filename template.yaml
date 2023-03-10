@@ -94,7 +94,7 @@ Parameters:
 
   SubnetsIds:
     Type: CommaDelimitedList
-    Description: If you require the Attini Lambda functions to be executed in any specific subnets, please fill it here. This also requers VpcId to be configured.
+    Description: If you require the Attini Lambda functions to be executed in any specific subnets, please fill it here. This also requires VpcId to be configured.
     Default: "AwsManagedNetwork"
 
   AwsServiceRolesContainsString:
@@ -104,6 +104,11 @@ Parameters:
       To limit Attini's access, you can set a required IAM Role path and/or IAM Role name prefix. If you want Attini to be able to apply
       any IAM Service role to your CloudFormation Stack, configure this to be *.
     Default: "attini"
+
+  CodeSigningProfileArn:
+    Type: String
+    Description: Arn of the code signing profile to use.
+    Default: "no-code-signing"
 
   LogLevel:
     Type: String
@@ -206,6 +211,7 @@ Metadata:
         - VpcId
         - SubnetsIds
         - AwsServiceRolesContainsString
+        - CodeSigningProfileArn
     - Label:
         default: Operations
       Parameters:
@@ -301,47 +307,12 @@ Conditions:
         - !Ref VpcId
         - "AwsManagedNetwork"
 
-  CodeSigningSupported:
-    !Not
-      - !Or
-        - !Equals
-          - !Ref AWS::Region
-          - ap-northeast-3
-        - !Equals
-          - !Ref AWS::Region
-          - ap-southeast-3
-        - !Equals
-          - !Ref AWS::Region
-          - ap-southeast-4
-        - !Equals
-          - !Ref AWS::Region
-          - me-central-1
-        - !Equals
-          - !Ref AWS::Region
-          - eu-south-2
-        - !Equals
-          - !Ref AWS::Region
-          - eu-central-2
-        - !Equals
-          - !Ref AWS::Region
-          - ap-south-2
 
-
-  ResourceGroupsSupported:
+  AddCodeSigningProfile:
     !Not
-      - !Or
-        - !Equals
-          - !Ref AWS::Region
-          - eu-south-2
-        - !Equals
-          - !Ref AWS::Region
-          - eu-central-2
-        - !Equals
-          - !Ref AWS::Region
-          - ap-south-2
-        - !Equals
-          - !Ref AWS::Region
-          - ap-southeast-4
+      - !Equals
+        - !Ref CodeSigningProfileArn
+        - "no-code-signing"
 
 Mappings:
   ResourceAllocation:
@@ -400,13 +371,15 @@ Resources:
 
   AttiniCodeSigningConfig:
     Type: AWS::Lambda::CodeSigningConfig
-    Condition: CodeSigningSupported
+    Condition: AddCodeSigningProfile
     DependsOn:
       - AttiniAutoUpdatePolicy
     Properties:
       AllowedPublishers:
         SigningProfileVersionArns:
-          - arn:aws:signer:eu-west-1:737842277702:/signing-profiles/attini_signature/sLBdQHvSCa
+          - !Ref CodeSigningProfileArn
+          # arn:aws:signer:eu-west-1:737842277702:/signing-profiles/attini_signature/sLBdQHvSCa
+
       CodeSigningPolicies:
         UntrustedArtifactOnDeployment: Warn # This is changed to "Enforce" by our build script
       Description: Code signing config that verifies that the lambda code is built by Attini
@@ -446,7 +419,7 @@ Resources:
           - !FindInMap [ ResourceAllocation, !Ref ResourceAllocation, AttiniDeploymentPlanSetupFunction ]
       CodeSigningConfigArn:
         !If
-          - CodeSigningSupported
+          - AddCodeSigningProfile
           - !GetAtt AttiniCodeSigningConfig.CodeSigningConfigArn
           - !Ref AWS::NoValue
       Environment:
@@ -577,7 +550,7 @@ Resources:
             Topic: !Ref AttiniRespondToInitDeployCfnEvent
       CodeSigningConfigArn:
         !If
-          - CodeSigningSupported
+          - AddCodeSigningProfile
           - !GetAtt AttiniCodeSigningConfig.CodeSigningConfigArn
           - !Ref AWS::NoValue
       ReservedConcurrentExecutions:
@@ -699,7 +672,7 @@ Resources:
       Role: !GetAtt AttiniActionLambdaServiceRole.Arn
       CodeSigningConfigArn:
         !If
-          - CodeSigningSupported
+          - AddCodeSigningProfile
           - !GetAtt AttiniCodeSigningConfig.CodeSigningConfigArn
           - !Ref AWS::NoValue
       ReservedConcurrentExecutions:
@@ -931,7 +904,7 @@ Resources:
           - !Ref InitDeployRoleArn
       CodeSigningConfigArn:
         !If
-          - CodeSigningSupported
+          - AddCodeSigningProfile
           - !GetAtt AttiniCodeSigningConfig.CodeSigningConfigArn
           - !Ref AWS::NoValue
       ReservedConcurrentExecutions:
@@ -1452,10 +1425,9 @@ Resources:
   AttiniResourceGroup:
     DependsOn:
       - AttiniAutoUpdatePolicy
-    Condition: ResourceGroupsSupported
     Type: AWS::ResourceGroups::Group
     Properties:
-      Description: Resource group that conitains all resources created for the attini setup
+      Description: Resource group that contains all resources created for the attini setup
       Name: attini-setup
       ResourceQuery:
         Query:
@@ -1480,7 +1452,7 @@ Resources:
       CodeUri: auto-update/
       CodeSigningConfigArn:
         !If
-          - CodeSigningSupported
+          - AddCodeSigningProfile
           - !GetAtt AttiniCodeSigningConfig.CodeSigningConfigArn
           - !Ref AWS::NoValue
       ReservedConcurrentExecutions:
