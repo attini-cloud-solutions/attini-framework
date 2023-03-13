@@ -1,4 +1,4 @@
-package attini.step.guard;
+package attini.step.guard.manualapproval;
 
 import attini.domain.DistributionName;
 import attini.domain.Environment;
@@ -9,7 +9,7 @@ import lombok.NonNull;
 import lombok.ToString;
 
 @ToString
-@Builder
+@Builder(builderClassName = "Builder")
 @EqualsAndHashCode
 @Getter
 public class ManualApprovalEvent {

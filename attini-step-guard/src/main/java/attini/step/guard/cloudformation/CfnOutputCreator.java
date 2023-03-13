@@ -14,7 +14,6 @@ import org.jboss.logging.Logger;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import attini.step.guard.CloudFormationClientFactory;
 import attini.step.guard.stackdata.DesiredState;
 import attini.step.guard.stackdata.StackData;
 import software.amazon.awssdk.services.cloudformation.model.DescribeStacksRequest;

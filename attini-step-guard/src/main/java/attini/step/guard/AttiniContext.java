@@ -7,9 +7,8 @@ import attini.domain.DistributionId;
 import attini.domain.DistributionName;
 import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
-import attini.step.guard.stackdata.ResourceState;
 
-public class AttiniContext implements ResourceState, DistributionContext {
+public class AttiniContext implements DistributionContext {
 
     private final Environment environment;
     private final DistributionId distributionId;

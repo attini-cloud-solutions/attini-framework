@@ -1,4 +1,4 @@
-package attini.step.guard;
+package attini.step.guard.manualapproval;
 
 import static java.util.Objects.requireNonNull;
 
@@ -6,6 +6,8 @@ import java.util.Map;
 
 import org.jboss.logging.Logger;
 
+import attini.step.guard.EnvironmentVariables;
+import attini.step.guard.StepFunctionFacade;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
@@ -49,7 +51,7 @@ public class ContinueExecutionService {
             if (event.isAbort()) {
                 stepFunctionFacade.sendTaskFailure(event.getSfnToken(),
                                                    "ManuallyAborted",
-                                                   event.getMessage() == null ? "aborted my user" : event.getMessage());
+                                                   event.getMessage() == null ? "aborted by user" : event.getMessage());
 
             } else {
                 stepFunctionFacade.sendTaskSuccess(event.getSfnToken(),

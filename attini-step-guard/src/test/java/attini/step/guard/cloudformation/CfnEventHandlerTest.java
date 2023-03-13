@@ -1,4 +1,4 @@
-package attini.step.guard;
+package attini.step.guard.cloudformation;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -12,13 +12,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import attini.step.guard.cloudformation.CfnEventHandler;
-import attini.step.guard.cloudformation.CfnEventType;
-import attini.step.guard.cloudformation.CfnOutputCreator;
-import attini.step.guard.cloudformation.CfnSnsEventTypeResolver;
-import attini.step.guard.cloudformation.CloudFormationManualTriggerEvent;
-import attini.step.guard.cloudformation.CloudFormationSnsEventImpl;
-import attini.step.guard.cloudformation.StackErrorResolver;
+import attini.step.guard.StackDataTestBuilder;
+import attini.step.guard.StepFunctionFacade;
+import attini.step.guard.StepGuardInputBuilder;
 import attini.step.guard.deploydata.DeployDataFacade;
 import attini.step.guard.stackdata.DesiredState;
 import attini.step.guard.stackdata.StackData;

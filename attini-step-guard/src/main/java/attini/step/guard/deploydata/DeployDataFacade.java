@@ -10,12 +10,12 @@ import java.util.Map;
 
 import org.jboss.logging.Logger;
 
+import attini.domain.DistributionContext;
 import attini.domain.ObjectIdentifier;
-import attini.step.guard.cloudformation.CloudFormationSnsEventImpl;
 import attini.step.guard.EnvironmentVariables;
+import attini.step.guard.cloudformation.CloudFormationSnsEventImpl;
 import attini.step.guard.cloudformation.InitDeploySnsEvent;
 import attini.step.guard.stackdata.InitDeployData;
-import attini.step.guard.stackdata.ResourceState;
 import attini.step.guard.stackdata.StackData;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -103,7 +103,7 @@ public class DeployDataFacade {
 
     }
 
-    public void addInitStackError(InitDeploySnsEvent cloudFormationEvent, ResourceState resourceState, String error) {
+    public void addInitStackError(InitDeploySnsEvent cloudFormationEvent, DistributionContext distributionContext, String error) {
 
         logger.info("Saving init deploy stack errors to deployment data");
         AttributeValue list = AttributeValue.builder()
@@ -122,8 +122,8 @@ public class DeployDataFacade {
                                                                                      .build()))
                                                              .build()).build();
 
-        String deployName = createDeployName(resourceState);
-        getDeployTimes(deployName, resourceState.getObjectIdentifier())
+        String deployName = createDeployName(distributionContext);
+        getDeployTimes(deployName, distributionContext.getObjectIdentifier())
                 .stream()
                 .map(deployTime -> createKey(deployName, deployTime))
                 .forEach(key -> dynamoDbClient.updateItem(UpdateItemRequest.builder()
@@ -178,11 +178,11 @@ public class DeployDataFacade {
 
     }
 
-    public void addExecutionError(ResourceState resourceState,
+    public void addExecutionError(DistributionContext distributionContext,
                                   String errorMessage) {
-        String deployName = createDeployName(resourceState);
+        String deployName = createDeployName(distributionContext);
 
-        logger.info("Setting execution errors, deploymentName = " + deployName + ", objectIdentifier = " + resourceState.getObjectIdentifier().asString());
+        logger.info("Setting execution errors, deploymentName = " + deployName + ", objectIdentifier = " + distributionContext.getObjectIdentifier().asString());
 
 
         AttributeValueUpdate errorMessageAttribute = AttributeValueUpdate.builder()
@@ -197,7 +197,7 @@ public class DeployDataFacade {
                                                                       .build();
 
 
-        getDeployTimes(deployName, resourceState.getObjectIdentifier())
+        getDeployTimes(deployName, distributionContext.getObjectIdentifier())
                 .stream()
                 .map(deployTime -> createKey(deployName, deployTime))
                 .forEach(key -> dynamoDbClient.updateItem(UpdateItemRequest.builder()
@@ -211,8 +211,8 @@ public class DeployDataFacade {
                                                                            .build()));
     }
 
-    private String createDeployName(ResourceState resourceState) {
-        return resourceState.getEnvironment().asString() + "-" + resourceState.getDistributionName().asString();
+    private String createDeployName(DistributionContext distributionContext) {
+        return distributionContext.getEnvironment().asString() + "-" + distributionContext.getDistributionName().asString();
     }
 
     private static Map<String, AttributeValue> createKey(String sourceName, String deployTime) {

@@ -4,7 +4,6 @@ import static java.util.Objects.requireNonNull;
 
 import org.jboss.logging.Logger;
 
-import attini.step.guard.InitDeployManualTriggerEvent;
 import attini.step.guard.StepFunctionFacade;
 import attini.step.guard.deploydata.DeployDataFacade;
 import attini.step.guard.stackdata.InitDeployData;
@@ -34,6 +33,7 @@ public class InitDeployEventHandler {
     }
 
     public void respondToManualInitDeployEvent(InitDeployManualTriggerEvent event) {
+        logger.info("Reacting to init deploy manual approval event");
         InitDeployData initDeployData = stackDataFacade.getInitDeployData(event.stackName());
         deployDataFacade.addDeploymentPlanData(initDeployData);
         stepFunctionFacade.runDeploymentPlan(initDeployData.getSfnArns());

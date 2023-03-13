@@ -7,7 +7,7 @@ package attini.step.guard;
 
 import static attini.step.guard.EventConverter.createInitDeployInput;
 import static attini.step.guard.EventConverter.createManualApprovalEvent;
-import static attini.step.guard.EventConverter.createManualInitDeployInput;
+import static attini.step.guard.EventConverter.createManualInitDeployEvent;
 import static attini.step.guard.EventConverter.createManualTriggerInput;
 import static attini.step.guard.EventConverter.createSnsEvent;
 import static java.util.Objects.requireNonNull;
@@ -28,6 +28,7 @@ import attini.step.guard.cdk.RegisterCdkStacksEvent;
 import attini.step.guard.cdk.RegisterCdkStacksService;
 import attini.step.guard.cloudformation.CfnEventHandler;
 import attini.step.guard.cloudformation.InitDeployEventHandler;
+import attini.step.guard.manualapproval.ContinueExecutionService;
 
 
 @Named("app")
@@ -68,7 +69,8 @@ public class App implements RequestHandler<Map<String, Object>, Object> {
             case CFN_SNS -> cfnEventHandler.respondToCloudFormationSnsEvent(createSnsEvent(jsonNode));
             case INIT_DEPLOY_CFN -> initDeployEventHandler.respondToInitDeployCfnEvent(createInitDeployInput(jsonNode));
             case CFN_MANUAL -> cfnEventHandler.respondToManualCfnEvent(createManualTriggerInput(jsonNode));
-            case INIT_DEPLOY_MANUAL_TRIGGER -> initDeployEventHandler.respondToManualInitDeployEvent(createManualInitDeployInput(jsonNode));
+            case INIT_DEPLOY_MANUAL_TRIGGER -> initDeployEventHandler.respondToManualInitDeployEvent(
+                    createManualInitDeployEvent(jsonNode));
             case CDK_REGISTER_STACKS -> {
                 try {
                    return registerCdkStacksService.registerStacks(mapper.treeToValue(jsonNode, RegisterCdkStacksEvent.class));

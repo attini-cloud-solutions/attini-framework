@@ -1,4 +1,4 @@
-package attini.step.guard;
+package attini.step.guard.cloudformation;
 
 import static java.util.Objects.requireNonNull;
 

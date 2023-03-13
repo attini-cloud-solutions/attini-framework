@@ -93,7 +93,8 @@ public class StackDataDynamoFacade implements StackDataFacade {
                                       ObjectIdentifier.of(item.get(OBJECT_IDENTIFIER).s()),
                                       Environment.of(item.get(ENVIRONMENT).s()),
                                       DistributionName.of(item.get(DISTRIBUTION_NAME).s()),
-                                      runners);
+                                      runners,
+                                      DistributionId.of(item.get(DISTRIBUTION_ID).s()));
 
         } else {
             String msg = String.format("Stack data for cfn stack %s was not found",
@@ -270,11 +271,11 @@ public class StackDataDynamoFacade implements StackDataFacade {
                                              .item(Map.of("resourceType",
                                                           stringAttribute("CdkStack"),
                                                           "name",
-                                                          stringAttribute("%s-%s-%s" .formatted(cdkStack.name(),
-                                                                                                cdkStack.environment()
-                                                                                                        .region(),
-                                                                                                cdkStack.environment()
-                                                                                                        .account())),
+                                                          stringAttribute("%s-%s-%s".formatted(cdkStack.name(),
+                                                                                               cdkStack.environment()
+                                                                                                       .region(),
+                                                                                               cdkStack.environment()
+                                                                                                       .account())),
                                                           STEP_NAME,
                                                           stringAttribute(stepName),
                                                           DISTRIBUTION_NAME,
@@ -282,8 +283,11 @@ public class StackDataDynamoFacade implements StackDataFacade {
                                                                                        .asString()),
                                                           DISTRIBUTION_ID,
                                                           stringAttribute(attiniContext.getDistributionId().asString()),
-                                                          OBJECT_IDENTIFIER, stringAttribute(attiniContext.getObjectIdentifier().asString()),
-                                                          ENVIRONMENT, stringAttribute(attiniContext.getEnvironment().asString())
+                                                          OBJECT_IDENTIFIER,
+                                                          stringAttribute(attiniContext.getObjectIdentifier()
+                                                                                       .asString()),
+                                                          ENVIRONMENT,
+                                                          stringAttribute(attiniContext.getEnvironment().asString())
                                              ))
                                              .build());
     }

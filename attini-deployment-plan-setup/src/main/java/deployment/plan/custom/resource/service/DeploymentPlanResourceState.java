@@ -27,12 +27,6 @@ public class DeploymentPlanResourceState {
     private final Map<String, Object> payloadDefaults;
 
 
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
-
     public String getAttiniEnvironmentName() {
         return attiniEnvironmentName;
     }

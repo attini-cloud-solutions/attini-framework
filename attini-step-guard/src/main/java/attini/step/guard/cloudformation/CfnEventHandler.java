@@ -9,7 +9,6 @@ import static java.util.Objects.requireNonNull;
 
 import org.jboss.logging.Logger;
 
-import attini.step.guard.StackError;
 import attini.step.guard.StepFunctionFacade;
 import attini.step.guard.deploydata.DeployDataFacade;
 import attini.step.guard.stackdata.DesiredState;

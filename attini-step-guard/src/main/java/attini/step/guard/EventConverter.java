@@ -16,12 +16,14 @@ import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
 import attini.step.guard.cloudformation.CloudFormationManualTriggerEvent;
 import attini.step.guard.cloudformation.CloudFormationSnsEventImpl;
+import attini.step.guard.cloudformation.InitDeployManualTriggerEvent;
 import attini.step.guard.cloudformation.InitDeploySnsEvent;
+import attini.step.guard.manualapproval.ManualApprovalEvent;
 import attini.step.guard.stackdata.DesiredState;
 
 public class EventConverter {
 
-    public static InitDeployManualTriggerEvent createManualInitDeployInput(JsonNode input) {
+    public static InitDeployManualTriggerEvent createManualInitDeployEvent(JsonNode input) {
         return new InitDeployManualTriggerEvent(input.get("stackName").textValue());
     }
 

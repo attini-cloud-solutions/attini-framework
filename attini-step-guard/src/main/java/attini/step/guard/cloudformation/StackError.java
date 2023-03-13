@@ -3,7 +3,7 @@
  * All Rights Reserved
  */
 
-package attini.step.guard;
+package attini.step.guard.cloudformation;
 
 import java.util.Objects;
 
