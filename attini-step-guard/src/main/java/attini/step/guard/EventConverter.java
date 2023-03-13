@@ -14,6 +14,9 @@ import attini.domain.DistributionId;
 import attini.domain.DistributionName;
 import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
+import attini.step.guard.cloudformation.CloudFormationManualTriggerEvent;
+import attini.step.guard.cloudformation.CloudFormationSnsEventImpl;
+import attini.step.guard.cloudformation.InitDeploySnsEvent;
 import attini.step.guard.stackdata.DesiredState;
 
 public class EventConverter {
@@ -105,21 +108,21 @@ public class EventConverter {
 
     }
 
-    public static CloudFormationSnsEvent createSnsEvent(JsonNode input) {
+    public static CloudFormationSnsEventImpl createSnsEvent(JsonNode input) {
         JsonNode jsonNode = input.get("Records")
                                  .get(0)
                                  .get("Sns");
         Map<String, String> message = createMessageMap(jsonNode.get("Message"));
 
-        CloudFormationSnsEvent.Builder builder = CloudFormationSnsEvent.builder()
-                                                                       .setStackName(message.get("StackName"))
-                                                                       .setResourceStatus(message.get("ResourceStatus"))
-                                                                       .setLogicalResourceId(message.get(
+        CloudFormationSnsEventImpl.Builder builder = CloudFormationSnsEventImpl.builder()
+                                                                               .setStackName(message.get("StackName"))
+                                                                               .setResourceStatus(message.get("ResourceStatus"))
+                                                                               .setLogicalResourceId(message.get(
                                                                                "LogicalResourceId"))
-                                                                       .setResourceType(message.get("ResourceType"))
-                                                                       .setClientRequestToken(message.get(
+                                                                               .setResourceType(message.get("ResourceType"))
+                                                                               .setClientRequestToken(message.get(
                                                                                "ClientRequestToken"))
-                                                                       .setStackId(message.get("StackId"));
+                                                                               .setStackId(message.get("StackId"));
 
         if (message.get("ResourceStatusReason") != null && !message.get("ResourceStatusReason").isEmpty()) {
             builder.setResourceStatusReason(message.get("ResourceStatusReason"));

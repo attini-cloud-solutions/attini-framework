@@ -20,11 +20,10 @@ import attini.domain.DistributionName;
 import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
 import attini.step.guard.AttiniContext;
-import attini.step.guard.CloudFormationEvent;
-import attini.step.guard.CloudFormationStackDataNotFoundException;
 import attini.step.guard.EnvironmentVariables;
-import attini.step.guard.InitDeploySnsEvent;
 import attini.step.guard.cdk.CdkStack;
+import attini.step.guard.cloudformation.CloudFormationEvent;
+import attini.step.guard.cloudformation.InitDeploySnsEvent;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValueUpdate;
@@ -97,10 +96,10 @@ public class StackDataDynamoFacade implements StackDataFacade {
                                       runners);
 
         } else {
-            String msg = String.format("Sfn response data for cfn stack %s was not found",
+            String msg = String.format("Stack data for cfn stack %s was not found",
                                        stackName);
             logger.fatal(msg);
-            throw new CloudFormationStackDataNotFoundException(msg);
+            throw new StackDataNotFoundException(msg);
         }
     }
 
@@ -154,10 +153,10 @@ public class StackDataDynamoFacade implements StackDataFacade {
                             .build();
 
         } else {
-            String msg = String.format("Sfn response data for cfn stack %s was not found",
+            String msg = String.format("Stack data for stack %s was not found",
                                        cloudFormationEvent.getStackName());
             logger.fatal(msg);
-            throw new CloudFormationStackDataNotFoundException(msg);
+            throw new StackDataNotFoundException(msg);
         }
     }
 

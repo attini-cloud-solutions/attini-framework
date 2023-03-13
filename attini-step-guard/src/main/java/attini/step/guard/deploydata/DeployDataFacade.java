@@ -11,9 +11,9 @@ import java.util.Map;
 import org.jboss.logging.Logger;
 
 import attini.domain.ObjectIdentifier;
-import attini.step.guard.CloudFormationSnsEvent;
+import attini.step.guard.cloudformation.CloudFormationSnsEventImpl;
 import attini.step.guard.EnvironmentVariables;
-import attini.step.guard.InitDeploySnsEvent;
+import attini.step.guard.cloudformation.InitDeploySnsEvent;
 import attini.step.guard.stackdata.InitDeployData;
 import attini.step.guard.stackdata.ResourceState;
 import attini.step.guard.stackdata.StackData;
@@ -37,7 +37,7 @@ public class DeployDataFacade {
         this.dynamoDbClient = requireNonNull(dynamoDbClient, "dynamoDbClient");
     }
 
-    public void addStackError(CloudFormationSnsEvent cloudFormationEvent, StackData resourceState, String error) {
+    public void addStackError(CloudFormationSnsEventImpl cloudFormationEvent, StackData resourceState, String error) {
         AttributeValue list = AttributeValue.builder()
                                             .l(AttributeValue.builder()
                                                              .m(Map.of("resourceName",
@@ -182,7 +182,7 @@ public class DeployDataFacade {
                                   String errorMessage) {
         String deployName = createDeployName(resourceState);
 
-        logger.info("Setting execution errors, deploymentName = " + deployName + ", objectIdentifier = " + resourceState.getObjectIdentifier());
+        logger.info("Setting execution errors, deploymentName = " + deployName + ", objectIdentifier = " + resourceState.getObjectIdentifier().asString());
 
 
         AttributeValueUpdate errorMessageAttribute = AttributeValueUpdate.builder()

@@ -3,14 +3,14 @@
  * All Rights Reserved
  */
 
-package attini.step.guard;
+package attini.step.guard.cloudformation;
 
 import static java.util.Objects.requireNonNull;
 
 import java.util.Objects;
 import java.util.Optional;
 
-public class InitDeploySnsEvent implements CloudFormationEvent {
+public class InitDeploySnsEvent implements CloudFormationSnsEvent {
     private final String stackName;
     private final String resourceStatus;
     private final String logicalResourceId;

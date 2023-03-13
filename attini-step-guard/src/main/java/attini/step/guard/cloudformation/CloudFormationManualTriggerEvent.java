@@ -3,13 +3,14 @@
  * All Rights Reserved
  */
 
-package attini.step.guard;
+package attini.step.guard.cloudformation;
 
 import static java.util.Objects.requireNonNull;
 
 import java.util.Objects;
 import java.util.Optional;
 
+import attini.step.guard.AttiniContext;
 import attini.step.guard.stackdata.DesiredState;
 
 public class CloudFormationManualTriggerEvent implements CloudFormationEvent {
@@ -46,10 +47,12 @@ public class CloudFormationManualTriggerEvent implements CloudFormationEvent {
         return new Builder();
     }
 
+    @Override
     public String getStackName() {
         return stackName;
     }
 
+    @Override
     public String getResourceStatus() {
         return resourceStatus;
     }
@@ -59,14 +62,17 @@ public class CloudFormationManualTriggerEvent implements CloudFormationEvent {
         return logicalResourceId;
     }
 
+    @Override
     public Optional<String> getRegion() {
         return Optional.ofNullable(region);
     }
 
+    @Override
     public Optional<String> getStackId() {
         return Optional.ofNullable(stackId);
     }
 
+    @Override
     public Optional<String> getExecutionRoleArn() {
         return Optional.ofNullable(executionRoleArn);
     }

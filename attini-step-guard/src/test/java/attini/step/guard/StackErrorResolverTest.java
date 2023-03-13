@@ -21,6 +21,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import attini.step.guard.cloudformation.CloudFormationSnsEventImpl;
+import attini.step.guard.cloudformation.StackErrorResolver;
 import software.amazon.awssdk.services.cloudformation.CloudFormationClient;
 import software.amazon.awssdk.services.cloudformation.model.DescribeStackEventsRequest;
 import software.amazon.awssdk.services.cloudformation.model.DescribeStackEventsResponse;
@@ -32,15 +34,15 @@ class StackErrorResolverTest {
 
     private static final String STACK_NAME = "my-init-stack";
 
-    private static final CloudFormationSnsEvent CLOUD_FORMATION_SNS_EVENT =
-            CloudFormationSnsEvent.builder()
-                                  .setStackName(STACK_NAME)
-                                  .setResourceStatus("UPDATE_FAILED")
-                                  .setStackId("a-stack-id")
-                                  .setClientRequestToken("test")
-                                  .setResourceType("Cloudformation")
-                                  .setLogicalResourceId(STACK_NAME)
-                                  .build();
+    private static final CloudFormationSnsEventImpl CLOUD_FORMATION_SNS_EVENT =
+            CloudFormationSnsEventImpl.builder()
+                                      .setStackName(STACK_NAME)
+                                      .setResourceStatus("UPDATE_FAILED")
+                                      .setStackId("a-stack-id")
+                                      .setClientRequestToken("test")
+                                      .setResourceType("Cloudformation")
+                                      .setLogicalResourceId(STACK_NAME)
+                                      .build();
 
     private static final StackError ERROR = StackError.builder()
                                                       .setErrorStatus("UPDATE_FAILED")

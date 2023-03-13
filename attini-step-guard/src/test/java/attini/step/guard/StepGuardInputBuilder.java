@@ -4,6 +4,8 @@ import attini.domain.DistributionId;
 import attini.domain.DistributionName;
 import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
+import attini.step.guard.cloudformation.CloudFormationManualTriggerEvent;
+import attini.step.guard.cloudformation.CloudFormationSnsEventImpl;
 import attini.step.guard.stackdata.DesiredState;
 
 public class StepGuardInputBuilder {
@@ -29,14 +31,14 @@ public class StepGuardInputBuilder {
                                                                               .build());
     }
 
-    public static CloudFormationSnsEvent.Builder aSnsTrigger() {
-        return CloudFormationSnsEvent.builder()
-                                     .setStackName("StackName")
-                                     .setResourceStatus("UPDATE_COMPLETE")
-                                     .setLogicalResourceId("StackName")
-                                     .setResourceType("AWS::CloudFormation::Stack")
-                                     .setClientRequestToken("ClientRequestToken")
-                                     .setStackId("StackId");
+    public static CloudFormationSnsEventImpl.Builder aSnsTrigger() {
+        return CloudFormationSnsEventImpl.builder()
+                                         .setStackName("StackName")
+                                         .setResourceStatus("UPDATE_COMPLETE")
+                                         .setLogicalResourceId("StackName")
+                                         .setResourceType("AWS::CloudFormation::Stack")
+                                         .setClientRequestToken("ClientRequestToken")
+                                         .setStackId("StackId");
 
     }
 }

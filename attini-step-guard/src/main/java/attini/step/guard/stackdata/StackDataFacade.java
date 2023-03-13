@@ -6,8 +6,8 @@
 package attini.step.guard.stackdata;
 
 import attini.step.guard.AttiniContext;
-import attini.step.guard.CloudFormationEvent;
-import attini.step.guard.InitDeploySnsEvent;
+import attini.step.guard.cloudformation.CloudFormationEvent;
+import attini.step.guard.cloudformation.InitDeploySnsEvent;
 import attini.step.guard.cdk.CdkStack;
 
 public interface StackDataFacade {

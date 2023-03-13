@@ -3,14 +3,14 @@
  * All Rights Reserved
  */
 
-package attini.step.guard;
+package attini.step.guard.cloudformation;
 
 import static java.util.Objects.requireNonNull;
 
 import java.util.Objects;
 import java.util.Optional;
 
-public class CloudFormationSnsEvent implements CloudFormationEvent {
+public class CloudFormationSnsEventImpl implements CloudFormationSnsEvent {
     private final String stackName;
     private final String resourceStatus;
     private final String logicalResourceId;
@@ -20,7 +20,7 @@ public class CloudFormationSnsEvent implements CloudFormationEvent {
     private final String resourceStatusReason;
 
 
-    private CloudFormationSnsEvent(Builder builder) {
+    private CloudFormationSnsEventImpl(Builder builder) {
         this.stackName = requireNonNull(builder.stackName, "stackName");
         this.resourceStatus = requireNonNull(builder.resourceStatus, "resourceStatus");
         this.logicalResourceId = requireNonNull(builder.logicalResourceId, "logicalResourceId");
@@ -80,7 +80,7 @@ public class CloudFormationSnsEvent implements CloudFormationEvent {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        CloudFormationSnsEvent that = (CloudFormationSnsEvent) o;
+        CloudFormationSnsEventImpl that = (CloudFormationSnsEventImpl) o;
         return Objects.equals(stackName, that.stackName) && Objects.equals(resourceStatus,
                                                                            that.resourceStatus) && Objects.equals(
                 logicalResourceId,
@@ -154,8 +154,8 @@ public class CloudFormationSnsEvent implements CloudFormationEvent {
             return this;
         }
 
-        public CloudFormationSnsEvent build() {
-            return new CloudFormationSnsEvent(this);
+        public CloudFormationSnsEventImpl build() {
+            return new CloudFormationSnsEventImpl(this);
         }
     }
 }

@@ -16,14 +16,14 @@ public class ContinueExecutionService {
 
 
     private final DynamoDbClient dynamoDbClient;
-    private final SfnResponseSender sfnResponseSender;
+    private final StepFunctionFacade stepFunctionFacade;
     private final EnvironmentVariables environmentVariables;
 
     public ContinueExecutionService(DynamoDbClient dynamoDbClient,
-                                    SfnResponseSender sfnResponseSender,
+                                    StepFunctionFacade stepFunctionFacade,
                                     EnvironmentVariables environmentVariables) {
         this.dynamoDbClient = requireNonNull(dynamoDbClient, "dynamoDbClient");
-        this.sfnResponseSender = requireNonNull(sfnResponseSender, "sfnResponseSender");
+        this.stepFunctionFacade = requireNonNull(stepFunctionFacade, "sfnResponseSender");
         this.environmentVariables = requireNonNull(environmentVariables, "environmentVariables");
     }
 
@@ -31,34 +31,40 @@ public class ContinueExecutionService {
 
         logger.info("Manual approval event triggered");
 
-        Map<String, AttributeValue> item = dynamoDbClient.getItem(GetItemRequest.builder()
-                                                                                .tableName(environmentVariables.getResourceStatesTableName())
-                                                                                .key(Map.of("resourceType",
-                                                                                            AttributeValue.builder()
-                                                                                                          .s("ManualApproval")
-                                                                                                          .build(),
-                                                                                            "name",
-                                                                                            AttributeValue.builder()
-                                                                                                          .s(event.getEnvironment()
-                                                                                                                  .asString() + "-" + event.getDistributionName()
-                                                                                                                                           .asString() + "-" + event.getStepName())
-                                                                                                          .build()))
-                                                                                .build()).item();
+        Map<String, AttributeValue> item =
+                dynamoDbClient.getItem(GetItemRequest.builder()
+                                                     .tableName(environmentVariables.getResourceStatesTableName())
+                                                     .key(Map.of("resourceType",
+                                                                 AttributeValue.builder()
+                                                                               .s("ManualApproval")
+                                                                               .build(),
+                                                                 "name",
+                                                                 AttributeValue.builder()
+                                                                               .s(createName(event))
+                                                                               .build()))
+                                                     .build())
+                              .item();
 
         if (event.getSfnToken().equals(item.get("sfnToken").s())) {
             if (event.isAbort()) {
-                sfnResponseSender.sendTaskFailure(event.getSfnToken(),
-                                                  "ManuallyAborted",
-                                                  event.getMessage() == null ? "aborted my user" : event.getMessage());
+                stepFunctionFacade.sendTaskFailure(event.getSfnToken(),
+                                                   "ManuallyAborted",
+                                                   event.getMessage() == null ? "aborted my user" : event.getMessage());
 
-            }else {
-                sfnResponseSender.sendTaskSuccess(event.getSfnToken(),
-                                                  event.getMessage() == null ? "{}" : "{\"message\":\"" + event.getMessage() + "\"}");
+            } else {
+                stepFunctionFacade.sendTaskSuccess(event.getSfnToken(),
+                                                   event.getMessage() == null ? "{}" : "{\"message\":\"" + event.getMessage() + "\"}");
             }
         } else {
             logger.warn("Different sfn token in dynamo vs request, will not continue the step function execution");
         }
 
+    }
+
+    private static String createName(ManualApprovalEvent event) {
+        return event.getEnvironment()
+                    .asString() + "-" + event.getDistributionName()
+                                             .asString() + "-" + event.getStepName();
     }
 
 }

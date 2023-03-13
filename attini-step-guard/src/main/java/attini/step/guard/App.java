@@ -26,26 +26,33 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import attini.step.guard.cdk.RegisterCdkStacksEvent;
 import attini.step.guard.cdk.RegisterCdkStacksService;
+import attini.step.guard.cloudformation.CfnEventHandler;
+import attini.step.guard.cloudformation.InitDeployEventHandler;
 
 
 @Named("app")
 public class App implements RequestHandler<Map<String, Object>, Object> {
     private static final Logger logger = Logger.getLogger(App.class);
 
-    private final RespondToCfnEvent respondToCfnEvent;
+    private final CfnEventHandler cfnEventHandler;
     private final ContinueExecutionService continueExecutionService;
     private final EventTypeResolver eventTypeResolver;
     private final RegisterCdkStacksService registerCdkStacksService;
+    private final InitDeployEventHandler initDeployEventHandler;
     private final ObjectMapper mapper;
 
     @Inject
-    public App(RespondToCfnEvent respondToCfnEvent,
+    public App(CfnEventHandler cfnEventHandler,
                ContinueExecutionService continueExecutionService,
-               EventTypeResolver eventTypeResolver, RegisterCdkStacksService registerCdkStacksService, ObjectMapper mapper) {
-        this.respondToCfnEvent = requireNonNull(respondToCfnEvent, "respondToCfnEvent");
+               EventTypeResolver eventTypeResolver,
+               RegisterCdkStacksService registerCdkStacksService,
+               InitDeployEventHandler initDeployEventHandler,
+               ObjectMapper mapper) {
+        this.cfnEventHandler = requireNonNull(cfnEventHandler, "respondToCfnEvent");
         this.continueExecutionService = requireNonNull(continueExecutionService, "continueExecutionService");
         this.eventTypeResolver = requireNonNull(eventTypeResolver, "eventTypeResolver");
         this.registerCdkStacksService = requireNonNull(registerCdkStacksService, "registerCdkStacksService");
+        this.initDeployEventHandler = requireNonNull(initDeployEventHandler, "initDeployEventHandler");
         this.mapper = requireNonNull(mapper, "mapper");
     }
 
@@ -58,10 +65,10 @@ public class App implements RequestHandler<Map<String, Object>, Object> {
         EventType eventType = eventTypeResolver.resolveEventType(jsonNode);
         switch (eventType) {
             case MANUAL_APPROVAL -> continueExecutionService.continueExecution(createManualApprovalEvent(jsonNode));
-            case CFN_SNS -> respondToCfnEvent.respondToCloudFormationSnsEvent(createSnsEvent(jsonNode));
-            case INIT_DEPLOY_CFN -> respondToCfnEvent.respondToInitDeployCfnEvent(createInitDeployInput(jsonNode));
-            case CFN_MANUAL -> respondToCfnEvent.respondToManualCfnEvent(createManualTriggerInput(jsonNode));
-            case INIT_DEPLOY_MANUAL_TRIGGER -> respondToCfnEvent.respondToManualInitDeployEvent(createManualInitDeployInput(jsonNode));
+            case CFN_SNS -> cfnEventHandler.respondToCloudFormationSnsEvent(createSnsEvent(jsonNode));
+            case INIT_DEPLOY_CFN -> initDeployEventHandler.respondToInitDeployCfnEvent(createInitDeployInput(jsonNode));
+            case CFN_MANUAL -> cfnEventHandler.respondToManualCfnEvent(createManualTriggerInput(jsonNode));
+            case INIT_DEPLOY_MANUAL_TRIGGER -> initDeployEventHandler.respondToManualInitDeployEvent(createManualInitDeployInput(jsonNode));
             case CDK_REGISTER_STACKS -> {
                 try {
                    return registerCdkStacksService.registerStacks(mapper.treeToValue(jsonNode, RegisterCdkStacksEvent.class));

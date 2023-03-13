@@ -3,7 +3,7 @@
  * All Rights Reserved
  */
 
-package attini.step.guard;
+package attini.step.guard.cloudformation;
 
 import static java.util.Objects.requireNonNull;
 
@@ -14,21 +14,24 @@ import org.jboss.logging.Logger;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import attini.step.guard.CloudFormationClientFactory;
 import attini.step.guard.stackdata.DesiredState;
 import attini.step.guard.stackdata.StackData;
 import software.amazon.awssdk.services.cloudformation.model.DescribeStacksRequest;
 import software.amazon.awssdk.services.cloudformation.model.DescribeStacksResponse;
 
 public class CfnOutputCreator {
-    private final static ObjectMapper objectMapper = new ObjectMapper();
 
     private static final Logger logger = Logger.getLogger(CfnOutputCreator.class);
 
     private final CloudFormationClientFactory cloudFormationClientFactory;
+    private final ObjectMapper objectMapper;
 
 
-    public CfnOutputCreator(CloudFormationClientFactory cloudFormationClientFactory) {
+    public CfnOutputCreator(CloudFormationClientFactory cloudFormationClientFactory,
+                            ObjectMapper objectMapper) {
         this.cloudFormationClientFactory = requireNonNull(cloudFormationClientFactory, "cloudFormationClientFactory");
+        this.objectMapper = requireNonNull(objectMapper, "objectMapper");
     }
 
     public String createCfnOutput(StackData stackData, CloudFormationEvent cloudFormationEvent) {
