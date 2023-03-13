@@ -3,12 +3,13 @@
  * All Rights Reserved
  */
 
-package attini.step.guard;
+package attini.step.guard.cloudformation;
 
 import static java.util.Objects.requireNonNull;
 
 import java.net.URI;
 
+import attini.step.guard.EnvironmentVariables;
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;

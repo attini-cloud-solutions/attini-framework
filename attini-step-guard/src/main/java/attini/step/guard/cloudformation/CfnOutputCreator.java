@@ -3,7 +3,7 @@
  * All Rights Reserved
  */
 
-package attini.step.guard;
+package attini.step.guard.cloudformation;
 
 import static java.util.Objects.requireNonNull;
 
@@ -20,15 +20,17 @@ import software.amazon.awssdk.services.cloudformation.model.DescribeStacksReques
 import software.amazon.awssdk.services.cloudformation.model.DescribeStacksResponse;
 
 public class CfnOutputCreator {
-    private final static ObjectMapper objectMapper = new ObjectMapper();
 
     private static final Logger logger = Logger.getLogger(CfnOutputCreator.class);
 
     private final CloudFormationClientFactory cloudFormationClientFactory;
+    private final ObjectMapper objectMapper;
 
 
-    public CfnOutputCreator(CloudFormationClientFactory cloudFormationClientFactory) {
+    public CfnOutputCreator(CloudFormationClientFactory cloudFormationClientFactory,
+                            ObjectMapper objectMapper) {
         this.cloudFormationClientFactory = requireNonNull(cloudFormationClientFactory, "cloudFormationClientFactory");
+        this.objectMapper = requireNonNull(objectMapper, "objectMapper");
     }
 
     public String createCfnOutput(StackData stackData, CloudFormationEvent cloudFormationEvent) {

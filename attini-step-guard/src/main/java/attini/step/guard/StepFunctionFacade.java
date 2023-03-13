@@ -7,17 +7,20 @@ package attini.step.guard;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.List;
+
 import org.jboss.logging.Logger;
 
 import software.amazon.awssdk.services.sfn.SfnClient;
 import software.amazon.awssdk.services.sfn.model.SendTaskFailureRequest;
 import software.amazon.awssdk.services.sfn.model.SendTaskSuccessRequest;
+import software.amazon.awssdk.services.sfn.model.StartExecutionRequest;
 
-public class SfnResponseSender {
-    private static final Logger logger = Logger.getLogger(SfnResponseSender.class);
+public class StepFunctionFacade {
+    private static final Logger logger = Logger.getLogger(StepFunctionFacade.class);
     private final SfnClient sfnClient;
 
-    public SfnResponseSender(SfnClient sfnClient) {
+    public StepFunctionFacade(SfnClient sfnClient) {
         this.sfnClient = requireNonNull(sfnClient, "sfnClient");
     }
     public void sendTaskSuccess(String sfnToken, String output){
@@ -38,6 +41,15 @@ public class SfnResponseSender {
                 .cause(cause)
                 .build();
         sfnClient.sendTaskFailure(failureRequest);
+    }
+
+    public void runDeploymentPlan(List<String> sfnArns) {
+        logger.info("Running " + sfnArns.size() + " deployment plans");
+        sfnArns.forEach(arn -> sfnClient.startExecution(StartExecutionRequest.builder()
+                                                                             .stateMachineArn(arn)
+                                                                             .build())
+
+        );
     }
 
 

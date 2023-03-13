@@ -232,13 +232,12 @@ public class DeployInitStackService {
     public Set<Parameter> createParameters(DistributionContext distributionContext, InitDeployStackConfig attiniInitDeployStackConfig, String templateUrl) {
 
 
-        String environmentName = distributionContext.getEnvironment().asString();
 
         HashMap<String, String> finalParameters = new HashMap<>(attiniInitDeployStackConfig.getParameters());
 
 
         finalParameters.put(ATTINI_DISTRIBUTION_NAME_KEY, distributionContext.getDistributionName().asString());
-        finalParameters.put(environmentVariables.getEnvironmentParameterName(), environmentName);
+        finalParameters.put(environmentVariables.getEnvironmentParameterName(), distributionContext.getEnvironment().asString());
         finalParameters.put(ATTINI_DISTRIBUTION_ID_KEY, distributionContext.getDistributionId().asString());
         finalParameters.put(ATTINI_RANDOM_STRING_KEY, UUID.randomUUID().toString());
 

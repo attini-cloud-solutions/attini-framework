@@ -8,12 +8,13 @@ package attini.step.guard.stackdata;
 import java.util.Objects;
 import java.util.Optional;
 
+import attini.domain.DistributionContext;
 import attini.domain.DistributionId;
 import attini.domain.DistributionName;
 import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
 
-public class StackData implements ResourceState {
+public class StackData implements DistributionContext {
     private final String sfnToken;
     private final String stackId;
     private final String stepName;

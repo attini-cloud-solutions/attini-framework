@@ -50,7 +50,6 @@
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>sfn</artifactId>
       <exclusions>
-        <!-- exclude the apache-client and netty client -->
         <exclusion>
           <groupId>software.amazon.awssdk</groupId>
           <artifactId>apache-client</artifactId>
@@ -65,7 +64,6 @@
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>cloudformation</artifactId>
       <exclusions>
-        <!-- exclude the apache-client and netty client -->
         <exclusion>
           <groupId>software.amazon.awssdk</groupId>
           <artifactId>apache-client</artifactId>

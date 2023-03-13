@@ -1,4 +1,4 @@
-package attini.step.guard;
+package attini.step.guard.cloudformation;
 
 import java.util.Optional;
 
@@ -17,5 +17,4 @@ public interface CloudFormationEvent {
     String getResourceStatus();
 
     String getLogicalResourceId();
-
 }

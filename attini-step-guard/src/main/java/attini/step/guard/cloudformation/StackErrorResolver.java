@@ -3,7 +3,7 @@
  * All Rights Reserved
  */
 
-package attini.step.guard;
+package attini.step.guard.cloudformation;
 
 import static java.util.Objects.requireNonNull;
 import static software.amazon.awssdk.services.cloudformation.model.ResourceStatus.CREATE_FAILED;

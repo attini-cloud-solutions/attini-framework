@@ -20,11 +20,10 @@ import attini.domain.DistributionName;
 import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
 import attini.step.guard.AttiniContext;
-import attini.step.guard.CloudFormationEvent;
-import attini.step.guard.CloudFormationStackDataNotFoundException;
 import attini.step.guard.EnvironmentVariables;
-import attini.step.guard.InitDeploySnsEvent;
 import attini.step.guard.cdk.CdkStack;
+import attini.step.guard.cloudformation.CloudFormationEvent;
+import attini.step.guard.cloudformation.InitDeploySnsEvent;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValueUpdate;
@@ -94,13 +93,14 @@ public class StackDataDynamoFacade implements StackDataFacade {
                                       ObjectIdentifier.of(item.get(OBJECT_IDENTIFIER).s()),
                                       Environment.of(item.get(ENVIRONMENT).s()),
                                       DistributionName.of(item.get(DISTRIBUTION_NAME).s()),
-                                      runners);
+                                      runners,
+                                      DistributionId.of(item.get(DISTRIBUTION_ID).s()));
 
         } else {
-            String msg = String.format("Sfn response data for cfn stack %s was not found",
+            String msg = String.format("Stack data for cfn stack %s was not found",
                                        stackName);
             logger.fatal(msg);
-            throw new CloudFormationStackDataNotFoundException(msg);
+            throw new StackDataNotFoundException(msg);
         }
     }
 
@@ -154,10 +154,10 @@ public class StackDataDynamoFacade implements StackDataFacade {
                             .build();
 
         } else {
-            String msg = String.format("Sfn response data for cfn stack %s was not found",
+            String msg = String.format("Stack data for stack %s was not found",
                                        cloudFormationEvent.getStackName());
             logger.fatal(msg);
-            throw new CloudFormationStackDataNotFoundException(msg);
+            throw new StackDataNotFoundException(msg);
         }
     }
 
@@ -271,11 +271,11 @@ public class StackDataDynamoFacade implements StackDataFacade {
                                              .item(Map.of("resourceType",
                                                           stringAttribute("CdkStack"),
                                                           "name",
-                                                          stringAttribute("%s-%s-%s" .formatted(cdkStack.name(),
-                                                                                                cdkStack.environment()
-                                                                                                        .region(),
-                                                                                                cdkStack.environment()
-                                                                                                        .account())),
+                                                          stringAttribute("%s-%s-%s".formatted(cdkStack.name(),
+                                                                                               cdkStack.environment()
+                                                                                                       .region(),
+                                                                                               cdkStack.environment()
+                                                                                                       .account())),
                                                           STEP_NAME,
                                                           stringAttribute(stepName),
                                                           DISTRIBUTION_NAME,
@@ -283,8 +283,11 @@ public class StackDataDynamoFacade implements StackDataFacade {
                                                                                        .asString()),
                                                           DISTRIBUTION_ID,
                                                           stringAttribute(attiniContext.getDistributionId().asString()),
-                                                          OBJECT_IDENTIFIER, stringAttribute(attiniContext.getObjectIdentifier().asString()),
-                                                          ENVIRONMENT, stringAttribute(attiniContext.getEnvironment().asString())
+                                                          OBJECT_IDENTIFIER,
+                                                          stringAttribute(attiniContext.getObjectIdentifier()
+                                                                                       .asString()),
+                                                          ENVIRONMENT,
+                                                          stringAttribute(attiniContext.getEnvironment().asString())
                                              ))
                                              .build());
     }
