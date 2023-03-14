@@ -108,6 +108,9 @@ public class DeployCfnCrossRegionService {
                 case VALIDATION_ERROR -> cfnErrorHandler.handleValidationError(stackData, e);
                 case NO_UPDATE_TO_PERFORM ->
                         cfnErrorHandler.handleNoUpdatesToPerformedState(stackData, "UPDATE_COMPLETE");
+                case ACCESS_DENIED -> throw new DeployCfnException(
+                        "Could not update stack, access denied, make sure Attini has permission to create, update and describe the stack.",
+                        e);
                 default -> {
                     logger.error(e.awsErrorDetails().errorCode());
                     logger.error(e.awsErrorDetails().errorMessage());

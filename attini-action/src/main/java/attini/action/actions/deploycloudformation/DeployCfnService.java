@@ -95,6 +95,9 @@ public class DeployCfnService {
                     createStack(stackData);
                     logger.info(String.format("Created CFN stack %s", stackName));
                 }
+                case ACCESS_DENIED -> throw new DeployCfnException(
+                        "Could not update stack, access denied, make sure Attini has permission to create, update and describe the stack.",
+                        e);
                 case VALIDATION_ERROR -> cfnErrorHandler.handleValidationError(stackData, e);
                 default -> {
                     logger.error(e.awsErrorDetails().errorCode());

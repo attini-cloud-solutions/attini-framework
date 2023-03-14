@@ -123,8 +123,8 @@ class DeployCfnStackServiceTest {
         StackConfiguration stackConfig = stackData.getStackConfiguration();
         doThrow(CloudFormationException.builder()
                                        .awsErrorDetails(AwsErrorDetails.builder()
-                                                                       .errorCode("AccessDenied")
-                                                                       .errorMessage("It went sideways")
+                                                                       .errorCode("SomeError")
+                                                                       .errorMessage("does not exist")
                                                                        .build()).build())
                 .when(cfnStackFacade).updateCfnStack(stackData);
 
