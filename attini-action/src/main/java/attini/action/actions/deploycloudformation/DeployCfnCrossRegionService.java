@@ -86,6 +86,7 @@ public class DeployCfnCrossRegionService {
             throw new IllegalStateException("The stack is being updated again by another account/region");
 
         } catch (CloudFormationException e) {
+            logger.info("Original exception message: "+ e.getMessage());
             CloudFormationErrorResolver.CloudFormationError cloudFormationError = resolveError(e);
             switch (cloudFormationError) {
                 case NO_STACK_EXISTS -> {
