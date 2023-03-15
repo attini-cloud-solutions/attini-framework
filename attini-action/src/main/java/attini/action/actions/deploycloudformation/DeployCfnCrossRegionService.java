@@ -110,12 +110,12 @@ public class DeployCfnCrossRegionService {
                 case NO_UPDATE_TO_PERFORM ->
                         cfnErrorHandler.handleNoUpdatesToPerformedState(stackData, "UPDATE_COMPLETE");
                 case ACCESS_DENIED -> throw new DeployCfnException(
-                        "Could not update stack, access denied, make sure Attini has permission to create, update and describe the stack.",
+                        "Could not update stack, access denied. Original error message: " + e.getMessage()  ,
                         e);
                 default -> {
                     logger.error(e.awsErrorDetails().errorCode());
                     logger.error(e.awsErrorDetails().errorMessage());
-                    throw new DeployCfnException("An error occurred when deploying cfn stack, error: " + e.awsErrorDetails()
+                    throw new DeployCfnException("An error occurred when deploying the CloudFormation stack, error: " + e.awsErrorDetails()
                                                                                                           .errorMessage(),
                                                  e);
                 }
