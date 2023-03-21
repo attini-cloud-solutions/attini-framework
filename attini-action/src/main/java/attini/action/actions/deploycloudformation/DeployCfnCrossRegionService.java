@@ -86,6 +86,7 @@ public class DeployCfnCrossRegionService {
             throw new IllegalStateException("The stack is being updated again by another account/region");
 
         } catch (CloudFormationException e) {
+            logger.info("Original exception message: "+ e.getMessage());
             CloudFormationErrorResolver.CloudFormationError cloudFormationError = resolveError(e);
             switch (cloudFormationError) {
                 case NO_STACK_EXISTS -> {
@@ -108,10 +109,13 @@ public class DeployCfnCrossRegionService {
                 case VALIDATION_ERROR -> cfnErrorHandler.handleValidationError(stackData, e);
                 case NO_UPDATE_TO_PERFORM ->
                         cfnErrorHandler.handleNoUpdatesToPerformedState(stackData, "UPDATE_COMPLETE");
+                case ACCESS_DENIED -> throw new DeployCfnException(
+                        "Could not update stack, access denied. Original error message: " + e.getMessage()  ,
+                        e);
                 default -> {
                     logger.error(e.awsErrorDetails().errorCode());
                     logger.error(e.awsErrorDetails().errorMessage());
-                    throw new DeployCfnException("An error occurred when deploying cfn stack, error: " + e.awsErrorDetails()
+                    throw new DeployCfnException("An error occurred when deploying the CloudFormation stack, error: " + e.awsErrorDetails()
                                                                                                           .errorMessage(),
                                                  e);
                 }

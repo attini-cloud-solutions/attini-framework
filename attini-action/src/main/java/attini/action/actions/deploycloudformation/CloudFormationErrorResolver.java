@@ -1,5 +1,6 @@
 package attini.action.actions.deploycloudformation;
 
+import static attini.action.actions.deploycloudformation.CloudFormationErrorResolver.CloudFormationError.ACCESS_DENIED;
 import static attini.action.actions.deploycloudformation.CloudFormationErrorResolver.CloudFormationError.NO_STACK_EXISTS;
 import static attini.action.actions.deploycloudformation.CloudFormationErrorResolver.CloudFormationError.NO_UPDATE_TO_PERFORM;
 import static attini.action.actions.deploycloudformation.CloudFormationErrorResolver.CloudFormationError.ROLLBACK_COMPLETE;
@@ -23,11 +24,15 @@ public class CloudFormationErrorResolver {
         if (validationError(cloudFormationException)){
             return VALIDATION_ERROR;
         }
+
+        if (accessDenied(cloudFormationException)){
+            return ACCESS_DENIED;
+        }
         return UNKNOWN_ERROR;
     }
 
     public enum CloudFormationError {
-        ROLLBACK_COMPLETE, NO_UPDATE_TO_PERFORM, NO_STACK_EXISTS, VALIDATION_ERROR, UNKNOWN_ERROR
+        ROLLBACK_COMPLETE, NO_UPDATE_TO_PERFORM, NO_STACK_EXISTS, VALIDATION_ERROR, UNKNOWN_ERROR, ACCESS_DENIED
     }
 
     private static boolean validationError(CloudFormationException e){
@@ -36,11 +41,14 @@ public class CloudFormationErrorResolver {
 
     private static boolean noStackExistsState(CloudFormationException cloudFormationException){
         return cloudFormationException.awsErrorDetails()
-                       .errorCode()
-                       .equals("AccessDenied")
-               || cloudFormationException.awsErrorDetails()
                        .errorMessage()
                        .contains("does not exist");
+    }
+
+    private static boolean accessDenied(CloudFormationException cloudFormationException){
+        return cloudFormationException.awsErrorDetails()
+                                      .errorCode()
+                                      .equals("AccessDenied");
     }
 
     private static boolean isInNoUpdateState(CloudFormationException cloudFormationException) {
