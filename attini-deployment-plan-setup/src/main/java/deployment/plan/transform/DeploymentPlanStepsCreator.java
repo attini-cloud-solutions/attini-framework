@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
 import org.jboss.logging.Logger;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -114,21 +115,25 @@ public class DeploymentPlanStepsCreator {
                 }
                 case "AttiniSam" -> {
                     JsonNode newStep = step.deepCopy();
-                    ObjectNode properties =  (ObjectNode) newStep.path("Properties");
+                    ObjectNode properties = (ObjectNode) newStep.path("Properties");
                     JsonNode project = properties.path("Project");
-                    if (project.isMissingNode()){
+                    if (project.isMissingNode()) {
                         throw new IllegalArgumentException("Project is missing in Sam step: " + entry.getKey());
                     }
-                    if (project.path("Path").isMissingNode()){
+                    if (project.path("Path").isMissingNode()) {
                         throw new IllegalArgumentException("Project.Path is missing in Sam step: " + entry.getKey());
                     }
 
-                    if (!properties.path("Region").isMissingNode() && !environmentVariables.getRegion().equals(properties.path("Region").asText())){
-                        throw new IllegalArgumentException("Cross region deployment is not supported for AttiniSam steps. Step: " + entry.getKey());
+                    if (!properties.path("Region").isMissingNode() && !environmentVariables.getRegion()
+                                                                                           .equals(properties.path(
+                                                                                                                     "Region")
+                                                                                                             .asText())) {
+                        throw new IllegalArgumentException(
+                                "Cross region deployment is not supported for AttiniSam steps. Step: " + entry.getKey());
 
                     }
 
-                    if (!project.path("Path").isTextual()){
+                    if (!project.path("Path").isTextual()) {
                         throw new IllegalArgumentException("Project.Path in AttiniSam step should be a string, step: " + entry.getKey());
                     }
 
@@ -199,9 +204,12 @@ public class DeploymentPlanStepsCreator {
                                attiniStepLoader.getAttiniRunner(step, entry.getKey()));
                 }
                 case "AttiniCdk" -> {
-                    attiniMangedSteps.add(new AttiniStep(entry.getKey(), "AttiniCdk"));
-                    states.set(entry.getKey(),
-                               attiniStepLoader.getAttiniCdk(step, entry.getKey()));
+                    Map<AttiniStep, JsonNode> attiniCdkSteps = attiniStepLoader.getAttiniCdk(step, entry.getKey());
+                    attiniMangedSteps.addAll(attiniCdkSteps.keySet());
+                    states.setAll(attiniCdkSteps.entrySet()
+                                                .stream()
+                                                .collect(Collectors.toMap(t -> t.getKey().name(),
+                                                                          Map.Entry::getValue)));
                 }
                 case "AttiniImport" -> {
                     attiniMangedSteps.add(new AttiniStep(entry.getKey(), "AttiniImport"));

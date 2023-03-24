@@ -147,6 +147,14 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
                     stepFunctionFacade.sendError(extractSfnToken(input), e.getMessage(), "CdkConfigError");
                 }
             }
+            case "DeployCdkChangeset" -> {
+                try {
+                    cdkRunnerAdapter.handleChangeset(toInput(input, CdkInput.class));
+                } catch (CouldNotParseInputException e) {
+                    logger.error("Could not parse cdk changeset input", e);
+                    stepFunctionFacade.sendError(extractSfnToken(input), e.getMessage(), "CdkConfigError");
+                }
+            }
             case "ExecuteRunner" -> {
                 logger.info("Runner triggered");
                 try {

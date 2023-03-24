@@ -17,6 +17,8 @@ public class TemplateFileLoaderImpl implements TemplateFileLoader {
 
     public static final String ATTINI_CDK_TEMPLATE_FILE = "attini-cdk-template.json";
 
+    public static final String ATTINI_CDK_CHANGESET_TEMPLATE_FILE = "attini-cdk-changeset-template.json";
+
     public static final String ATTINI_IMPORT_TEMPLATE_FILE = "attini-import-template.json";
 
     public static final String ATTINI_INVOKE_TEMPLATE_FILE = "attini-lambda-invoke-template.json";
@@ -52,6 +54,11 @@ public class TemplateFileLoaderImpl implements TemplateFileLoader {
     @Override
     public File getAttiniCdkTemplate() {
         return new File(ATTINI_CDK_TEMPLATE_FILE);
+    }
+
+    @Override
+    public File getAttiniCdkChangesetTemplate() {
+        return new File(ATTINI_CDK_CHANGESET_TEMPLATE_FILE);
     }
 
     @Override

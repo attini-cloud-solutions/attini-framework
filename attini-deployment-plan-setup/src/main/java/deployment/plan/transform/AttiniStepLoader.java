@@ -10,6 +10,7 @@ import static java.util.Objects.requireNonNull;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Map;
 
 import org.jboss.logging.Logger;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -49,7 +50,7 @@ public class AttiniStepLoader {
 
     }
 
-    public JsonNode getAttiniCdk(JsonNode originalStep, String stepName) {
+    public Map<AttiniStep, JsonNode> getAttiniCdk(JsonNode originalStep, String stepName) {
         JsonNode path = originalStep.path("Properties").path("Path");
         if (path.isMissingNode() || path.asText().isBlank()) {
             ObjectNode properties = (ObjectNode) originalStep.get("Properties");
@@ -59,7 +60,57 @@ public class AttiniStepLoader {
             properties.put("Path", "." + properties.get("Path").asText());
         }
 
-        return getAttiniRunnerStep(originalStep, templateFileLoader.getAttiniCdkTemplate(), stepName);
+        if (!originalStep.path("Properties").path("ChangeSet").isMissingNode()) {
+            String deployStepName = stepName + "CdkDeploy";
+            String choiceName = stepName + "CdkChoice";
+            String approvalName = stepName + "CdkApproval";
+
+
+            Map<AttiniStep, JsonNode> steps = new java.util.HashMap<>();
+            // add diff check
+            ObjectNode diffStep = originalStep.deepCopy();
+            diffStep.put("Next", choiceName);
+
+            steps.put(new AttiniStep(stepName, "attiniCdkDiff"), getAttiniRunnerStep(diffStep,
+                                                    templateFileLoader.getAttiniCdkChangesetTemplate(),
+                                                    stepName));
+
+            // add choice
+            ObjectNode choice = objectMapper.createObjectNode();
+            choice.put("Type", "Choice")
+                  .set("Choices", objectMapper.createArrayNode()
+                                              .add(objectMapper.createObjectNode()
+                                                               .put("Variable",
+                                                                    "$.output."+stepName+".result")
+                                                               .put("StringEquals", "change-detected")
+                                                               .put("Next", approvalName)));
+
+            if (originalStep.path("Next").isMissingNode()) {
+                String passStepName = stepName + "EndStep";
+                steps.put(new AttiniStep(passStepName, "Pass"), objectMapper
+                        .createObjectNode()
+                        .put("Type", "Pass")
+                        .put("End", Boolean.TRUE));
+                choice.put("Default", passStepName);
+            } else {
+                choice.set("Default", originalStep.get("Next"));
+            }
+            steps.put(new AttiniStep(choiceName, "Choice"), choice);
+
+
+            ObjectNode manualApprovalStep = originalStep.deepCopy();
+            manualApprovalStep.put("Next", deployStepName);
+
+            steps.put(new AttiniStep(approvalName, "AttiniManualApproval"), getAttiniManualApproval(manualApprovalStep, approvalName));
+
+            //add cdk step
+            steps.put(new AttiniStep(deployStepName, "AttiniCdk"), getAttiniRunnerStep(originalStep,
+                                                          templateFileLoader.getAttiniCdkTemplate(),
+                                                          deployStepName));
+            return steps;
+        }
+
+        return Map.of(new AttiniStep(stepName, "AttiniCdk"), getAttiniRunnerStep(originalStep, templateFileLoader.getAttiniCdkTemplate(), stepName));
     }
 
     public JsonNode getAttiniImport(JsonNode originalStep, String stepName) {
@@ -267,6 +318,4 @@ public class AttiniStepLoader {
 
         return newStep;
     }
-
-
 }

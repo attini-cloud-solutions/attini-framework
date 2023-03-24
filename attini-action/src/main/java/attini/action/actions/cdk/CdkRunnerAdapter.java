@@ -52,6 +52,37 @@ public class CdkRunnerAdapter {
 
     }
 
+    public void handleChangeset(CdkInput cdkInput) {
+
+        logger.info("Attini cdk change set step triggered");
+
+
+        String diffCommand = createCdkCommands(cdkInput.properties()).buildDiffCommand();
+
+        List<String> commands = List.of("cd " + cdkInput.properties().path(),
+                                        "echo  'Running cdk diff command: " + diffCommand + "'",
+                                        """
+                                                if %s; then
+                                                  echo no-change > ${ATTINI_OUTPUT}
+                                                else
+                                                  echo change-detected > ${ATTINI_OUTPUT}
+                                                fi
+                                                """.formatted(diffCommand));
+        RunnerProperties runnerProperties = new RunnerProperties(commands,
+                                                                 cdkInput.properties().runner(),
+                                                                 cdkInput.properties()
+                                                                         .environment());
+
+        runnerHandler.handle(new RunnerInput(cdkInput.output(),
+                                             runnerProperties,
+                                             cdkInput.deploymentPlanExecutionMetadata(),
+                                             cdkInput.deployOriginData(),
+                                             cdkInput.dependencies(),
+                                             cdkInput.customData(),
+                                             cdkInput.stackParameters()));
+
+    }
+
     private static CdkCommandBuilder createCdkCommands(CdkProperties properties) {
 
 

@@ -2,14 +2,20 @@ package attini.step.guard.cdk;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import org.jboss.logging.Logger;
 
 import attini.step.guard.AttiniContext;
 import attini.step.guard.EnvironmentVariables;
 import attini.step.guard.stackdata.StackDataFacade;
 
 public class RegisterCdkStacksService {
+
+    private static final Logger logger = Logger.getLogger(RegisterCdkStacksService.class);
+
 
     private final StackDataFacade stackDataFacade;
     private final EnvironmentVariables environmentVariables;
@@ -21,6 +27,8 @@ public class RegisterCdkStacksService {
     }
 
     public Map<String, Object> registerStacks(RegisterCdkStacksEvent event) {
+
+        logger.info("Processing cdk stack event: " + event);
 
         AttiniContext context = AttiniContext.builder()
                                              .setDistributionId(event.distributionId())
@@ -42,15 +50,16 @@ public class RegisterCdkStacksService {
 
         return event.stacks()
                     .stream()
-                    .collect(Collectors.toMap(CdkStack::id, cdkStack ->{
+                    .collect(Collectors.toMap(CdkStack::id, cdkStack -> {
+
                         long nrOfStacksWithName = event.stacks()
-                                          .stream()
-                                          .filter(cdkStack1 -> cdkStack1.name().equals(cdkStack.name()))
-                                          .count();
-                        if (nrOfStacksWithName > 1){
+                                                       .stream()
+                                                       .filter(cdkStack1 -> cdkStack1.name().equals(cdkStack.name()))
+                                                       .count();
+                        if (nrOfStacksWithName > 1) {
                             return "Could not resolve stack output, multiple stacks with same name detected in app";
                         }
-                        return  event.outputs().get(cdkStack.name());
+                        return event.outputs().getOrDefault(cdkStack.name(), Collections.emptyMap());
                     }));
     }
 

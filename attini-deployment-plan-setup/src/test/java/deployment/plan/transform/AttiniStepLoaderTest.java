@@ -2,8 +2,12 @@ package deployment.plan.transform;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -14,9 +18,7 @@ class AttiniStepLoaderTest {
 
     @BeforeEach
     void setUp() {
-
         attiniStepLoader = new AttiniStepLoader(templateFileLoader, objectMapper);
-
     }
 
     @Test
@@ -26,7 +28,7 @@ class AttiniStepLoaderTest {
                                                            "DeploySocksDB");
 
 
-        assertEquals(requestResponse.expectedResponse(), result);
+        assertJsonEquals(requestResponse.expectedResponse(), result);
 
     }
 
@@ -36,7 +38,7 @@ class AttiniStepLoaderTest {
         JsonNode result = attiniStepLoader.getAttiniCfn(requestResponse.request(),
                                                         "DeploySocksDB");
 
-        assertEquals(requestResponse.expectedResponse(), result);
+        assertJsonEquals(requestResponse.expectedResponse(), result);
     }
 
     @Test
@@ -46,7 +48,7 @@ class AttiniStepLoaderTest {
         JsonNode result = attiniStepLoader.getAttiniLambdaInvoke(requestResponse.request(),
                                                                  "InvokeMyLambda");
 
-        assertEquals(requestResponse.expectedResponse(), result);
+        assertJsonEquals(requestResponse.expectedResponse(), result);
     }
 
     @Test
@@ -54,7 +56,7 @@ class AttiniStepLoaderTest {
         AbstractRequestResponse requestResponse = new RunnerRequestResponse();
 
         JsonNode result = attiniStepLoader.getAttiniRunner(requestResponse.request(), "Step1b1");
-        assertEquals(requestResponse.expectedResponse(), result);
+        assertJsonEquals(requestResponse.expectedResponse(), result);
 
     }
 
@@ -62,9 +64,26 @@ class AttiniStepLoaderTest {
     void getAttiniCdk() {
         AbstractRequestResponse requestResponse = new CdkRequestResponse();
 
-        JsonNode result = attiniStepLoader.getAttiniCdk(requestResponse.request(), "Step1b1");
+        Map<AttiniStep, JsonNode> result = attiniStepLoader.getAttiniCdk(requestResponse.request(), "Step1b1");
 
-        assertEquals(requestResponse.expectedResponse(), result);
+        assertJsonEquals(requestResponse.expectedResponse(), result.get(new AttiniStep("Step1b1", "AttiniCdk")));
+
+    }
+
+    @Test
+    void getAttiniCdkWithChangeSet() {
+        AbstractRequestResponse requestResponse = new CdkRequestWithChangesetResponse();
+
+        JsonNode result =
+                objectMapper.createObjectNode()
+                            .setAll(attiniStepLoader.getAttiniCdk(requestResponse.request(), "Step1b1")
+                                                    .entrySet()
+                                                    .stream()
+                                                    .collect(Collectors.toMap(t -> t.getKey().name(),
+                                                                              Map.Entry::getValue)));
+
+
+        assertJsonEquals(requestResponse.expectedResponse(), result);
 
     }
 
@@ -75,7 +94,7 @@ class AttiniStepLoaderTest {
 
         JsonNode result = attiniStepLoader.getAttiniImport(requestResponse.request(), "GetSocksDbArn");
 
-        assertEquals(requestResponse.expectedResponse(), result);
+        assertJsonEquals(requestResponse.expectedResponse(), result);
     }
 
     @Test
@@ -85,7 +104,7 @@ class AttiniStepLoaderTest {
 
         JsonNode result = attiniStepLoader.getAttiniManualApproval(requestResponse.request(), "GetSocksDbArn");
 
-        assertEquals(requestResponse.expectedResponse(), result);
+        assertJsonEquals(requestResponse.expectedResponse(), result);
     }
 
     @Test
@@ -95,6 +114,21 @@ class AttiniStepLoaderTest {
 
         JsonNode result = attiniStepLoader.getAttiniMergeOutput(requestResponse.request());
 
-        assertEquals(requestResponse.expectedResponse(), result);
+        assertJsonEquals(requestResponse.expectedResponse(), result);
+    }
+
+
+    /**
+     * Assert equals and print result if there is an error.
+     * @param expected expected json node
+     * @param result actual json node
+     */
+    private void assertJsonEquals(JsonNode expected, JsonNode result) {
+        try {
+            assertEquals(expected,
+                         result, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(result));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
