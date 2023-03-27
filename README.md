@@ -7,6 +7,11 @@ our [documentation](https://docs.attini.io/).
 If you just want to use Attini, we recommend using the prebuilt framework
 and CLI, find more information in the [getting started](https://attini.io/guides/get-started/) guide.
 
+### Associated projects
+The [Attini CLI](https://github.com/attini-cloud-solutions/attini-cli), 
+[Attini runner](https://github.com/attini-cloud-solutions/attini-runner), and 
+[Attini CDK Constructs](https://github.com/attini-cloud-solutions/attini-cdk-constructs) are
+also available on GitHub.
 
 
 ## Compile and deploy the framework
