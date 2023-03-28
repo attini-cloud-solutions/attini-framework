@@ -33,7 +33,7 @@
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
-      <version>1.18.24</version>
+      <version>1.18.26</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -65,6 +65,10 @@
           <groupId>software.amazon.awssdk</groupId>
         </exclusion>
         <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>netty-nio-client</artifactId>
+        </exclusion>
+        <exclusion>
           <artifactId>commons-logging</artifactId>
           <groupId>commons-logging</groupId>
         </exclusion>
@@ -77,6 +81,10 @@
         <exclusion>
           <artifactId>apache-client</artifactId>
           <groupId>software.amazon.awssdk</groupId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>netty-nio-client</artifactId>
         </exclusion>
         <exclusion>
           <artifactId>commons-logging</artifactId>
@@ -99,6 +107,10 @@
         <exclusion>
           <artifactId>commons-logging</artifactId>
           <groupId>commons-logging</groupId>
+        </exclusion>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>netty-nio-client</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
