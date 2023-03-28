@@ -95,7 +95,7 @@ public class AttiniStepLoader {
             ObjectNode diffStep = originalStep.deepCopy();
             diffStep.put("Next", choiceName);
 
-            steps.put(new AttiniStep(diffStepName, "attiniCdkDiff"), getAttiniRunnerStep(diffStep,
+            steps.put(new AttiniStep(diffStepName, "AttiniRunnerJob"), getAttiniRunnerStep(diffStep,
                                                     templateFileLoader.getAttiniCdkChangesetTemplate(),
                                                                                          diffStepName));
 
