@@ -3,6 +3,7 @@ package deployment.plan.transform;
 import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -46,13 +47,22 @@ public class DeploymentPlanStepsCreator {
 
     public DeploymentPlanDefinition createDefinition(DeploymentPlan deploymentPlan, boolean shouldAddSam) {
 
-        ObjectNode states = getDeployDataState(deploymentPlan, shouldAddSam);
 
-        DeploymentPlanStates deploymentPlanSteps = transformStates(objectMapper.valueToTree(deploymentPlan.getStates()),
+        ObjectNode states = objectMapper.createObjectNode();
+
+        states.setAll(getDeployDataState(deploymentPlan, shouldAddSam));
+        states.setAll((ObjectNode) objectMapper.valueToTree(deploymentPlan.getStates()));
+        // ObjectNode originalStates = objectMapper.valueToTree(deploymentPlan.getStates());
+        //  originalStates.setAll(getDeployDataState(deploymentPlan, shouldAddSam));
+        DeploymentPlanStates deploymentPlanSteps = transformStates(states,
                                                                    false, "DeploymentPlan");
-        states.setAll((ObjectNode) deploymentPlanSteps.states());
 
-        return new DeploymentPlanDefinition(Map.of("StartAt", GET_DEPLOY_DATA_KEY, "States", states),
+        //   states.setAll((ObjectNode) deploymentPlanSteps.states());
+
+        return new DeploymentPlanDefinition(Map.of("StartAt",
+                                                   GET_DEPLOY_DATA_KEY,
+                                                   "States",
+                                                   deploymentPlanSteps.states()),
                                             deploymentPlanSteps.attiniSteps());
     }
 
@@ -87,11 +97,15 @@ public class DeploymentPlanStepsCreator {
     private DeploymentPlanStates transformStates(JsonNode originalStates,
                                                  boolean isMap,
                                                  String stepName) {
+        logger.info("Transforming states for branch");
+
         List<AttiniStep> attiniMangedSteps = new ArrayList<>();
 
-        ObjectNode states = originalStates.deepCopy();
+        ObjectNode states = objectMapper.createObjectNode();
 
-        Iterator<Map.Entry<String, JsonNode>> fields = states.fields();
+        Iterator<Map.Entry<String, JsonNode>> fields = originalStates.fields();
+
+        Map<String, String> nextReplacements = new HashMap<>();
 
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> entry = fields.next();
@@ -204,7 +218,9 @@ public class DeploymentPlanStepsCreator {
                                attiniStepLoader.getAttiniRunner(step, entry.getKey()));
                 }
                 case "AttiniCdk" -> {
-                    Map<AttiniStep, JsonNode> attiniCdkSteps = attiniStepLoader.getAttiniCdk(step, entry.getKey());
+                    Map<AttiniStep, JsonNode> attiniCdkSteps = attiniStepLoader.getAttiniCdk(step,
+                                                                                             entry.getKey(),
+                                                                                             nextReplacements);
                     attiniMangedSteps.addAll(attiniCdkSteps.keySet());
                     states.setAll(attiniCdkSteps.entrySet()
                                                 .stream()
@@ -220,10 +236,23 @@ public class DeploymentPlanStepsCreator {
                     states.set(entry.getKey(),
                                attiniStepLoader.getAttiniManualApproval(step, entry.getKey()));
                 }
+                default -> states.set(entry.getKey(), step);
 
             }
 
         }
+
+        states.fields()
+              .forEachRemaining(entry -> {
+                  if (nextReplacements.containsKey(entry.getValue().path("Next").asText())) {
+                      ObjectNode objectNode = (ObjectNode) entry.getValue();
+                      objectNode.put("Next", nextReplacements.get(entry.getValue().path("Next").asText()));
+                  }
+                  if (nextReplacements.containsKey(entry.getValue().path("Default").asText())) {
+                      ObjectNode objectNode = (ObjectNode) entry.getValue();
+                      objectNode.put("Default", nextReplacements.get(entry.getValue().path("Default").asText()));
+                  }
+              });
         return new DeploymentPlanStates(attiniMangedSteps, states);
 
     }

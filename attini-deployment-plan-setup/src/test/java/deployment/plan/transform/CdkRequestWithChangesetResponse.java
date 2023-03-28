@@ -12,7 +12,7 @@ public class CdkRequestWithChangesetResponse extends AbstractRequestResponse{
                     "Properties": {
                         "Runner": "HelloWorldRunner",
                         "Path": "/project",
-                        "ChangeSet": true,
+                        "Diff": {"Enabled": true},
                         "Context": {
                              "Vpc.$": "$.test"
                            },
@@ -37,7 +37,7 @@ public class CdkRequestWithChangesetResponse extends AbstractRequestResponse{
 
         String response = """
                 {
-                   "Step1b1CdkDeploy" : {
+                   "Step1b1" : {
                      "Type" : "Task",
                      "Resource" : "arn:aws:states:::lambda:invoke.waitForTaskToken",
                      "Parameters" : {
@@ -60,7 +60,7 @@ public class CdkRequestWithChangesetResponse extends AbstractRequestResponse{
                          "Properties" : {
                            "Runner" : "HelloWorldRunner",
                            "Path" : "./project",
-                           "ChangeSet" : true,
+                           "Diff" : {"Enabled": true},
                            "Context" : {
                              "Vpc.$" : "$.test"
                            },
@@ -78,18 +78,18 @@ public class CdkRequestWithChangesetResponse extends AbstractRequestResponse{
                        "BackoffRate" : 1.2
                      } ],
                      "Next" : "Step2b1",
-                     "ResultPath" : "$.output.Step1b1CdkDeploy"
+                     "ResultPath" : "$.output.Step1b1"
                    },
-                   "Step1b1CdkChoice" : {
+                   "Step1b1ApproveChanges?" : {
                      "Type" : "Choice",
                      "Choices" : [ {
-                       "Variable" : "$.output.Step1b1.result",
+                       "Variable" : "$.output.Step1b1CdkDiff.result",
                        "StringEquals" : "change-detected",
-                       "Next" : "Step1b1CdkApproval"
+                       "Next" : "Step1b1ApproveChanges"
                      } ],
-                     "Default" : "Step2b1"
+                     "Default": "c0e8021dffea9af8e9c48265f5e646af"
                    },
-                   "Step1b1CdkApproval" : {
+                   "Step1b1ApproveChanges" : {
                      "Type" : "Task",
                      "Resource" : "arn:aws:states:::lambda:invoke.waitForTaskToken",
                      "Parameters" : {
@@ -108,18 +108,6 @@ public class CdkRequestWithChangesetResponse extends AbstractRequestResponse{
                            "sfnToken.$" : "$$.Task.Token",
                            "retryCounter.$" : "$$.State.RetryCount",
                            "stepName.$" : "$$.State.Name"
-                         },
-                         "Properties" : {
-                           "Runner" : "HelloWorldRunner",
-                           "Path" : "./project",
-                           "ChangeSet" : true,
-                           "Context" : {
-                             "Vpc.$" : "$.test"
-                           },
-                           "StackConfiguration" : [ {
-                             "StackName" : "CarlStack",
-                             "Parameters" : { }
-                           } ]
                          }
                        }
                      },
@@ -129,10 +117,10 @@ public class CdkRequestWithChangesetResponse extends AbstractRequestResponse{
                        "MaxAttempts" : 30,
                        "BackoffRate" : 1.2
                      } ],
-                     "Next" : "Step1b1CdkDeploy",
-                     "ResultPath" : "$.output.Step1b1CdkApproval"
+                     "Next" : "c0e8021dffea9af8e9c48265f5e646af",
+                     "ResultPath" : "$.output.Step1b1ApproveChanges"
                    },
-                   "Step1b1" : {
+                   "Step1b1CdkDiff" : {
                      "Type" : "Task",
                      "Resource" : "arn:aws:states:::lambda:invoke.waitForTaskToken",
                      "Parameters" : {
@@ -155,7 +143,7 @@ public class CdkRequestWithChangesetResponse extends AbstractRequestResponse{
                          "Properties" : {
                            "Runner" : "HelloWorldRunner",
                            "Path" : "./project",
-                           "ChangeSet" : true,
+                           "Diff" : {"Enabled": true},
                            "Context" : {
                              "Vpc.$" : "$.test"
                            },
@@ -172,8 +160,8 @@ public class CdkRequestWithChangesetResponse extends AbstractRequestResponse{
                        "MaxAttempts" : 30,
                        "BackoffRate" : 1.2
                      } ],
-                     "Next" : "Step1b1CdkChoice",
-                     "ResultPath" : "$.output.Step1b1"
+                     "Next" : "Step1b1ApproveChanges?",
+                     "ResultPath" : "$.output.Step1b1CdkDiff"
                    }
                  }
                 """;

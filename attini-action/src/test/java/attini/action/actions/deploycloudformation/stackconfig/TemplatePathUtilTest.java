@@ -55,7 +55,6 @@ class TemplatePathUtilTest {
         String expectedResult = "https://some/path";
 
         String templatePath = TemplatePathUtil.getTemplatePath(url, prefix);
-        System.out.println(templatePath);
         assertEquals(expectedResult, templatePath);
     }
 

@@ -43,13 +43,6 @@
                 "Type": "Task",
                 "Resource": "arn:aws:lambda:eu-west-1:855066048591:function:dev-lambda-test",
                 "TimeoutSeconds": 300,
-                "Next": "SamStuff"
-              },
-              "SamStuff": {
-                "Type": "AttiniSam",
-                "Properties": {
-                  "Project": "/sam-test"
-                },
                 "Next": "DeployCfn"
               },
               "DeployCfn": {

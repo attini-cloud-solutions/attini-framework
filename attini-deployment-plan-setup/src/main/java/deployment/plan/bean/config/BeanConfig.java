@@ -60,17 +60,23 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
+    public Ec2Client ec2Client(EnvironmentVariables environmentVariables){
+        return Ec2Client.builder()
+                                       .region(Region.of(environmentVariables.getRegion()))
+                                       .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                                       .overrideConfiguration(createClientOverrideConfiguration())
+                                       .httpClient(UrlConnectionHttpClient.builder().build())
+                                       .endpointOverride(getAwsServiceEndpoint("ec2", environmentVariables.getRegion()))
+                                       .build();
+    }
+
+    @ApplicationScoped
     public TransformDeploymentPlanCloudFormation transformDeploymentPlanCloudFormation(EnvironmentVariables environmentVariables,
                                                                                        ObjectMapper objectMapper,
-                                                                                       DeploymentPlanStepsCreator deploymentPlanStepsCreator) {
+                                                                                       DeploymentPlanStepsCreator deploymentPlanStepsCreator,
+                                                                                       Ec2Client ec2Client) {
 
-        Ec2Client ec2Client = Ec2Client.builder()
-                                 .region(Region.of(environmentVariables.getRegion()))
-                                 .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
-                                 .overrideConfiguration(createClientOverrideConfiguration())
-                                 .httpClient(UrlConnectionHttpClient.builder().build())
-                                 .endpointOverride(getAwsServiceEndpoint("ec2", environmentVariables.getRegion()))
-                                 .build();
+
         return new TransformDeploymentPlanCloudFormation(environmentVariables,
                                                          ec2Client,
                                                          objectMapper,

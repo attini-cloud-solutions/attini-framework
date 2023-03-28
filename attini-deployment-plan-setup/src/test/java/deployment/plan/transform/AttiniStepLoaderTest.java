@@ -2,6 +2,7 @@ package deployment.plan.transform;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -64,7 +65,7 @@ class AttiniStepLoaderTest {
     void getAttiniCdk() {
         AbstractRequestResponse requestResponse = new CdkRequestResponse();
 
-        Map<AttiniStep, JsonNode> result = attiniStepLoader.getAttiniCdk(requestResponse.request(), "Step1b1");
+        Map<AttiniStep, JsonNode> result = attiniStepLoader.getAttiniCdk(requestResponse.request(), "Step1b1", new HashMap<>());
 
         assertJsonEquals(requestResponse.expectedResponse(), result.get(new AttiniStep("Step1b1", "AttiniCdk")));
 
@@ -76,7 +77,7 @@ class AttiniStepLoaderTest {
 
         JsonNode result =
                 objectMapper.createObjectNode()
-                            .setAll(attiniStepLoader.getAttiniCdk(requestResponse.request(), "Step1b1")
+                            .setAll(attiniStepLoader.getAttiniCdk(requestResponse.request(), "Step1b1", new HashMap<>())
                                                     .entrySet()
                                                     .stream()
                                                     .collect(Collectors.toMap(t -> t.getKey().name(),
