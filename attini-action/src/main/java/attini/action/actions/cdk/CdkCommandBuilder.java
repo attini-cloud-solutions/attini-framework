@@ -185,6 +185,16 @@ class CdkCommandBuilder {
                stacks;
     }
 
+    public String buildDiffCommand() {
+        return "cdk diff --fail" +
+               NO_COLOR +
+               roleArn +
+               buildCommand +
+               plugins +
+               context +
+               stacks;
+    }
+
     public static CdkCommandBuilder builder(List<String> stacks, String outputFile) {
         return new CdkCommandBuilder(stacks, outputFile);
     }

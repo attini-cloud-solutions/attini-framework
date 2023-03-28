@@ -19,6 +19,8 @@ public interface TemplateFileLoader {
 
     File getAttiniCdkTemplate();
 
+    File getAttiniCdkChangesetTemplate();
+
     File getAttiniImportTemplate();
 
     File getAttiniManualApprovalTemplate();

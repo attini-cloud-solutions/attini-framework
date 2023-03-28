@@ -3,10 +3,12 @@ package deployment.plan.transform;
 import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
 import org.jboss.logging.Logger;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -45,13 +47,22 @@ public class DeploymentPlanStepsCreator {
 
     public DeploymentPlanDefinition createDefinition(DeploymentPlan deploymentPlan, boolean shouldAddSam) {
 
-        ObjectNode states = getDeployDataState(deploymentPlan, shouldAddSam);
 
-        DeploymentPlanStates deploymentPlanSteps = transformStates(objectMapper.valueToTree(deploymentPlan.getStates()),
+        ObjectNode states = objectMapper.createObjectNode();
+
+        states.setAll(getDeployDataState(deploymentPlan, shouldAddSam));
+        states.setAll((ObjectNode) objectMapper.valueToTree(deploymentPlan.getStates()));
+        // ObjectNode originalStates = objectMapper.valueToTree(deploymentPlan.getStates());
+        //  originalStates.setAll(getDeployDataState(deploymentPlan, shouldAddSam));
+        DeploymentPlanStates deploymentPlanSteps = transformStates(states,
                                                                    false, "DeploymentPlan");
-        states.setAll((ObjectNode) deploymentPlanSteps.states());
 
-        return new DeploymentPlanDefinition(Map.of("StartAt", GET_DEPLOY_DATA_KEY, "States", states),
+        //   states.setAll((ObjectNode) deploymentPlanSteps.states());
+
+        return new DeploymentPlanDefinition(Map.of("StartAt",
+                                                   GET_DEPLOY_DATA_KEY,
+                                                   "States",
+                                                   deploymentPlanSteps.states()),
                                             deploymentPlanSteps.attiniSteps());
     }
 
@@ -86,11 +97,15 @@ public class DeploymentPlanStepsCreator {
     private DeploymentPlanStates transformStates(JsonNode originalStates,
                                                  boolean isMap,
                                                  String stepName) {
+        logger.info("Transforming states for branch");
+
         List<AttiniStep> attiniMangedSteps = new ArrayList<>();
 
-        ObjectNode states = originalStates.deepCopy();
+        ObjectNode states = objectMapper.createObjectNode();
 
-        Iterator<Map.Entry<String, JsonNode>> fields = states.fields();
+        Iterator<Map.Entry<String, JsonNode>> fields = originalStates.fields();
+
+        Map<String, String> nextReplacements = new HashMap<>();
 
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> entry = fields.next();
@@ -114,21 +129,25 @@ public class DeploymentPlanStepsCreator {
                 }
                 case "AttiniSam" -> {
                     JsonNode newStep = step.deepCopy();
-                    ObjectNode properties =  (ObjectNode) newStep.path("Properties");
+                    ObjectNode properties = (ObjectNode) newStep.path("Properties");
                     JsonNode project = properties.path("Project");
-                    if (project.isMissingNode()){
+                    if (project.isMissingNode()) {
                         throw new IllegalArgumentException("Project is missing in Sam step: " + entry.getKey());
                     }
-                    if (project.path("Path").isMissingNode()){
+                    if (project.path("Path").isMissingNode()) {
                         throw new IllegalArgumentException("Project.Path is missing in Sam step: " + entry.getKey());
                     }
 
-                    if (!properties.path("Region").isMissingNode() && !environmentVariables.getRegion().equals(properties.path("Region").asText())){
-                        throw new IllegalArgumentException("Cross region deployment is not supported for AttiniSam steps. Step: " + entry.getKey());
+                    if (!properties.path("Region").isMissingNode() && !environmentVariables.getRegion()
+                                                                                           .equals(properties.path(
+                                                                                                                     "Region")
+                                                                                                             .asText())) {
+                        throw new IllegalArgumentException(
+                                "Cross region deployment is not supported for AttiniSam steps. Step: " + entry.getKey());
 
                     }
 
-                    if (!project.path("Path").isTextual()){
+                    if (!project.path("Path").isTextual()) {
                         throw new IllegalArgumentException("Project.Path in AttiniSam step should be a string, step: " + entry.getKey());
                     }
 
@@ -199,9 +218,14 @@ public class DeploymentPlanStepsCreator {
                                attiniStepLoader.getAttiniRunner(step, entry.getKey()));
                 }
                 case "AttiniCdk" -> {
-                    attiniMangedSteps.add(new AttiniStep(entry.getKey(), "AttiniCdk"));
-                    states.set(entry.getKey(),
-                               attiniStepLoader.getAttiniCdk(step, entry.getKey()));
+                    Map<AttiniStep, JsonNode> attiniCdkSteps = attiniStepLoader.getAttiniCdk(step,
+                                                                                             entry.getKey(),
+                                                                                             nextReplacements);
+                    attiniMangedSteps.addAll(attiniCdkSteps.keySet());
+                    states.setAll(attiniCdkSteps.entrySet()
+                                                .stream()
+                                                .collect(Collectors.toMap(t -> t.getKey().name(),
+                                                                          Map.Entry::getValue)));
                 }
                 case "AttiniImport" -> {
                     attiniMangedSteps.add(new AttiniStep(entry.getKey(), "AttiniImport"));
@@ -212,10 +236,23 @@ public class DeploymentPlanStepsCreator {
                     states.set(entry.getKey(),
                                attiniStepLoader.getAttiniManualApproval(step, entry.getKey()));
                 }
+                default -> states.set(entry.getKey(), step);
 
             }
 
         }
+
+        states.fields()
+              .forEachRemaining(entry -> {
+                  if (nextReplacements.containsKey(entry.getValue().path("Next").asText())) {
+                      ObjectNode objectNode = (ObjectNode) entry.getValue();
+                      objectNode.put("Next", nextReplacements.get(entry.getValue().path("Next").asText()));
+                  }
+                  if (nextReplacements.containsKey(entry.getValue().path("Default").asText())) {
+                      ObjectNode objectNode = (ObjectNode) entry.getValue();
+                      objectNode.put("Default", nextReplacements.get(entry.getValue().path("Default").asText()));
+                  }
+              });
         return new DeploymentPlanStates(attiniMangedSteps, states);
 
     }
