@@ -181,7 +181,7 @@ public class EcsFacade {
                                                                                         .name(containerName)
                                                                                         .command("/bin/bash",
                                                                                                  "-c",
-                                                                                                 "attini-runner dry-run > /dev/null 2>&1; if [ $? -eq 127 ]; then echo \"attini-runner not found so installing it.\"; curl -sfL#o $HOME/attini-runner https://docs.attini.io/api/v1/runner/get-runner/$(uname -m)/$(uname -s)/1.2.6; chmod +x $HOME/attini-runner; $HOME/attini-runner '" + sfnToken + "'; else attini-runner '" + sfnToken + "'; fi;")
+                                                                                                 "attini-runner dry-run > /dev/null 2>&1; if [ $? -eq 127 ]; then echo \"attini-runner not found so installing it.\"; curl -sfL#o $HOME/attini-runner https://docs.attini.io/api/v1/runner/get-runner/$(uname -m)/$(uname -s)/1.2.11; chmod +x $HOME/attini-runner; $HOME/attini-runner '" + sfnToken + "'; else attini-runner '" + sfnToken + "'; fi;")
                                                                                         .environment(variables)
                                                                                         .build());
 
