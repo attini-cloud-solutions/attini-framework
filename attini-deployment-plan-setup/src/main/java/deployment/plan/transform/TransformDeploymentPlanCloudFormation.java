@@ -82,7 +82,8 @@ public class TransformDeploymentPlanCloudFormation {
         AttiniRunners attiniRunners = new AttiniRunners(resources,
                                                         ec2Client,
                                                         environmentVariables.getRegion(),
-                                                        environmentVariables.getAccount());
+                                                        environmentVariables.getAccount(),
+                                                        environmentVariables.getDefaultRunnerImage());
 
         return Stream.of(attiniRunners.getSqsQueues(),
                          attiniRunners.getSecurityGroups(),

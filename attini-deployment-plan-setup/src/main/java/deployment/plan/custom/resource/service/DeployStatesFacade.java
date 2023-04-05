@@ -142,6 +142,33 @@ public class DeployStatesFacade {
             map.put("startupCommands", AttributeValueUpdate.builder().action(AttributeAction.DELETE).build());
         }
 
+        runner.getEc2Configuration()
+              .ifPresentOrElse(ec2Configuration -> map.put("ec2Configuration",
+                                                           AttributeValueUpdate.builder()
+                                                                               .value(AttributeValue.builder()
+                                                                                                    .m(Map.of(
+                                                                                                            "instanceType",
+                                                                                                            AttributeValue.builder()
+                                                                                                                          .s(ec2Configuration.getInstanceType()
+                                                                                                                                             .asString())
+                                                                                                                          .build(),
+                                                                                                            "instanceProfile",
+                                                                                                            AttributeValue.builder()
+                                                                                                                          .s(ec2Configuration.getInstanceProfile()
+                                                                                                                                             .asString())
+                                                                                                                          .build(),
+                                                                                                            "ecsClientLogGroup",
+                                                                                                            AttributeValue.builder()
+                                                                                                                          .s(ec2Configuration.getEcsClientLogGroup()
+                                                                                                                                             .asString())
+                                                                                                                          .build()))
+                                                                                                    .build())
+                                                                               .build()),
+                               () -> map.put("ec2Configuration",
+                                             AttributeValueUpdate.builder()
+                                                                 .action(AttributeAction.DELETE)
+                                                                 .build()));
+
         dynamoDbClient.updateItem(UpdateItemRequest.builder()
                                                    .tableName(environmentVariables.getResourceStatesTableName())
                                                    .key(Map.of("resourceType",

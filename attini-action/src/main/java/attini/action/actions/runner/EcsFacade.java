@@ -19,6 +19,8 @@ import software.amazon.awssdk.services.ecs.model.InvalidParameterException;
 import software.amazon.awssdk.services.ecs.model.KeyValuePair;
 import software.amazon.awssdk.services.ecs.model.LaunchType;
 import software.amazon.awssdk.services.ecs.model.NetworkConfiguration;
+import software.amazon.awssdk.services.ecs.model.PlacementConstraint;
+import software.amazon.awssdk.services.ecs.model.PlacementConstraintType;
 import software.amazon.awssdk.services.ecs.model.PropagateTags;
 import software.amazon.awssdk.services.ecs.model.RunTaskRequest;
 import software.amazon.awssdk.services.ecs.model.RunTaskResponse;
@@ -71,8 +73,13 @@ public class EcsFacade {
 
     }
 
-    public String startTask(TaskConfiguration runnerConfig, String stackName, String runnerName, String sfnToken) {
+    public String startTask(RunnerData runnerData,
+                            String sfnToken) {
 
+
+        TaskConfiguration runnerConfig = runnerData.getTaskConfiguration();
+
+        boolean isEc2Task = runnerData.getEc2().isPresent();
         NetworkConfiguration networkConfiguration =
                 NetworkConfiguration
                         .builder()
@@ -86,27 +93,43 @@ public class EcsFacade {
 
 
         RunTaskRequest.Builder builder = RunTaskRequest.builder()
-                                                       .launchType(LaunchType.FARGATE)
-                                                       .networkConfiguration(networkConfiguration)
+                                                       .enableECSManagedTags(isEc2Task)
+
+                                                       .launchType(isEc2Task ? LaunchType.EC2 : LaunchType.FARGATE)
                                                        .propagateTags(PropagateTags.TASK_DEFINITION)
                                                        .taskDefinition(runnerConfig.taskDefinitionArn())
                                                        .cluster(runnerConfig.cluster())
-                                                       .overrides(getOverrides(runnerConfig,
-                                                                               stackName,
-                                                                               runnerName,
+                                                       .overrides(getOverrides(runnerData,
                                                                                sfnToken));
 
+        if (isEc2Task) {
+            builder.placementConstraints(PlacementConstraint.builder()
+                                                            .type(PlacementConstraintType.MEMBER_OF)
+                                                            .expression("attribute:runnerResourceName == " + runnerData.getAttiniRunnerResourceName())
+                                                            .build());
+        }
 
+        if (!isEc2Task) {
+            builder.networkConfiguration(networkConfiguration);
+        }
         RunTaskResponse runTaskResponse = ecsClient.runTask(builder.build());
 
 
+        if (!runTaskResponse.failures().isEmpty()){
+            logger.error("Ecs task failed to start");
+            runTaskResponse.failures().forEach(logger::error);
+        }
+
+        if (runTaskResponse.tasks().isEmpty()){
+            throw new RuntimeException("Ecs task failed to start. Reason: " + runTaskResponse.failures());
+        }
         return runTaskResponse.tasks().get(0).taskArn();
     }
 
-    private TaskOverride getOverrides(TaskConfiguration taskConfig,
-                                      String stackName,
-                                      String runnerName,
+    private TaskOverride getOverrides(RunnerData runnerData,
                                       String sfnToken) {
+
+        TaskConfiguration taskConfig = runnerData.getTaskConfiguration();
 
         String containerName = taskConfig.container().orElseGet(() -> {
             List<ContainerDefinition> containerDefinitions = ecsClient.describeTaskDefinition(
@@ -133,9 +156,9 @@ public class EcsFacade {
                                       toEnvVariable("ATTINI_RESOURCE_STATE_TABLE",
                                                     environmentVariables.getResourceStatesTableName()),
                                       toEnvVariable("ATTINI_CONFIGURATION_HASH",
-                                                    String.valueOf(taskConfig.hashCode())),
+                                                    String.valueOf(runnerData.currentConfigurationHash())),
                                       toEnvVariable("ATTINI_RUNNER_RESOURCE_NAME",
-                                                    stackName + "-" + runnerName),
+                                                    runnerData.getAttiniRunnerResourceName()),
                                       toEnvVariable("ATTINI_DISABLE_ANSI_COLOR",
                                                     "true"),
                                       toEnvVariable("ATTINI_AWS_ACCOUNT", environmentVariables.getAccountId()),
@@ -174,6 +197,10 @@ public class EcsFacade {
                                              "ATTINI_LOG_LEVEL",
                                              logLevel.name()))
                   );
+
+        runnerData.getEc2()
+                  .flatMap(Ec2::getLatestEc2InstanceId)
+                  .ifPresent(s -> variables.add(toEnvVariable("ATTINI_EC2_INSTANCE_ID", s)));
 
 
         TaskOverride.Builder builder = TaskOverride.builder()

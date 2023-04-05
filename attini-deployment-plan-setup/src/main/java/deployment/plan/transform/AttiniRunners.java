@@ -47,7 +47,10 @@ public class AttiniRunners {
     }
 
     public AttiniRunners(Map<String, Map<String, Object>> resources,
-                         Ec2Client ec2Client, String region, String accountId) {
+                         Ec2Client ec2Client,
+                         String region,
+                         String accountId,
+                         String defaultRunnerImage) {
         ObjectMapper objectMapper = new ObjectMapper();
 
 
@@ -135,17 +138,61 @@ public class AttiniRunners {
                                     }
 
                                     if (!jsonNode.path("Image").isMissingNode()) {
-                                        String TaskDefinitionName = entry.getKey() + "TaskDefinition";
+                                        String taskDefinitionName = entry.getKey() + "TaskDefinition";
                                         String logGroupName = entry.getKey() + "LogGroup";
                                         runnerBuilder.taskDefinitionArn(CfnString.create(objectMapper.valueToTree(Map.of(
                                                 "Ref",
-                                                TaskDefinitionName))));
+                                                taskDefinitionName))));
                                         CfnString roleArn = createRoleArnRef(objectMapper, jsonNode.path("RoleArn"));
-                                        taskDefinitions.put(TaskDefinitionName,
-                                                            Resources.taskDefinition(CfnString.create(jsonNode.get(
-                                                                    "Image")), roleArn, logGroupName));
-
+                                        if (jsonNode.path("Ec2Configuration").isMissingNode()) {
+                                            taskDefinitions.put(taskDefinitionName,
+                                                                Resources.taskDefinition(CfnString.create(jsonNode.get(
+                                                                        "Image")), roleArn, logGroupName));
+                                        } else {
+                                            taskDefinitions.put(taskDefinitionName,
+                                                                Resources.ec2taskDefinition(CfnString.create(jsonNode.get(
+                                                                        "Image")), roleArn, logGroupName));
+                                        }
                                         logGroups.put(logGroupName, Resources.logGroup());
+                                    }
+
+
+                                    if (!jsonNode.path("Ec2Configuration").isMissingNode()) {
+                                        String ecsClientLogGroup = entry.getKey() + "EcsClientLogGroup";
+                                        taskDefinitions.put(ecsClientLogGroup, Resources.logGroup());
+
+                                        runnerBuilder
+                                                .ec2Configuration(Ec2Configuration
+                                                                          .builder()
+                                                                          .ecsClientLogGroup(CfnString.create(
+                                                                                  objectMapper.valueToTree(
+                                                                                          Map.of("Ref",
+                                                                                                 ecsClientLogGroup))))
+                                                                          .instanceProfile(
+                                                                                  createDefaultInstanceProfileRef(
+                                                                                          objectMapper,
+                                                                                          jsonNode.path("Ec2Configuration")
+                                                                                                  .path("InstanceProfileName")))
+                                                                          .instanceType(CfnString.create(
+                                                                                  jsonNode.path("Ec2Configuration")
+                                                                                          .path("InstanceType")))
+                                                                          .build());
+                                        if (jsonNode.path("Image").isMissingNode()) {
+                                            String taskDefinitionName = entry.getKey() + "TaskDefinition";
+                                            taskDefinitions.put(taskDefinitionName,
+                                                                Resources.ec2taskDefinition(CfnString.create(
+                                                                                                    defaultRunnerImage),
+                                                                                            createRoleArnRef(
+                                                                                                    objectMapper,
+                                                                                                    jsonNode.path(
+                                                                                                            "RoleArn")),
+                                                                                            entry.getKey() + "LogGroup"));
+                                            runnerBuilder.taskDefinitionArn(CfnString.create(objectMapper.valueToTree(
+                                                    Map.of(
+                                                            "Ref",
+                                                            taskDefinitionName))));
+                                        }
+
                                     }
                                     return runnerBuilder.build();
                                 })
@@ -160,6 +207,16 @@ public class AttiniRunners {
                            "arn:aws:iam::${AWS::AccountId}:role/attini/attini-default-runner-role-${AWS::Region}")));
         }
         return CfnString.create(roleArnNode);
+    }
+
+    private static CfnString createDefaultInstanceProfileRef(ObjectMapper objectMapper, JsonNode instanceProfileNode) {
+
+        if (instanceProfileNode.isMissingNode()) {
+            return CfnString.create(objectMapper.valueToTree(
+                    Map.of("Fn::Sub",
+                           "attini-runner-default-instance-profile-${AWS::Region}")));
+        }
+        return CfnString.create(instanceProfileNode);
     }
 
     private void validateVpcConfigProperty(JsonNode jsonNode, String name, String runnerName) {

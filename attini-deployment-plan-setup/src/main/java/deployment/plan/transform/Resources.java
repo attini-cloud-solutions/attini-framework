@@ -83,4 +83,33 @@ public class Resources {
                                            "NetworkMode", "awsvpc",
                                            "RequiresCompatibilities", List.of("FARGATE")));
     }
+
+    public static Map<String, Object> ec2taskDefinition(CfnString image, CfnString roleArn, String logGroup) {
+
+        Map<String, Object> logConfiguration = Map.of("LogDriver",
+                                                      "awslogs",
+                                                      "Options",
+                                                      Map.of("awslogs-group",
+                                                             Map.of("Ref", logGroup),
+                                                             "awslogs-region",
+                                                             Map.of("Ref", "AWS::Region"),
+                                                             "awslogs-stream-prefix", "logs"));
+        List<Map<String, Object>> containers = List.of(Map.of("Name",
+                                                              "Container",
+                                                              "Image",
+                                                              image,
+                                                              "Privileged", true,
+                                                              "LogConfiguration",
+                                                              logConfiguration));
+
+        return Map.of("Type", "AWS::ECS::TaskDefinition",
+                      "Properties", Map.of("ContainerDefinitions",
+                                           containers,
+                                           "Cpu", 512,
+                                           "ExecutionRoleArn", roleArn,
+                                           "TaskRoleArn", roleArn,
+                                           "Memory", 3072,
+                                           "NetworkMode", "bridge",
+                                           "RequiresCompatibilities", List.of("EC2")));
+    }
 }

@@ -26,17 +26,19 @@ public class RunnerHandler {
     private final StackDataDynamoFacade stackDataDynamoFacade;
     private final StepFunctionFacade stepFunctionFacade;
     private final ObjectMapper objectMapper;
+    private final Ec2Facade ec2Facade;
 
     public RunnerHandler(SqsClient sqsClient,
                          EcsFacade ecsFacade,
                          StackDataDynamoFacade stackDataDynamoFacade,
                          StepFunctionFacade stepFunctionFacade,
-                         ObjectMapper objectMapper) {
+                         ObjectMapper objectMapper, Ec2Facade ec2Facade) {
         this.sqsClient = requireNonNull(sqsClient, "sqsClient");
         this.ecsFacade = requireNonNull(ecsFacade, "ecsFacade");
         this.stackDataDynamoFacade = requireNonNull(stackDataDynamoFacade, "stackDataDynamoFacade");
         this.stepFunctionFacade = requireNonNull(stepFunctionFacade, "stepFunctionFacade");
-        this.objectMapper = objectMapper;
+        this.objectMapper = requireNonNull(objectMapper, "objectMapper");
+        this.ec2Facade = requireNonNull(ec2Facade, "ec2Facade");
     }
 
     public void handle(RunnerInput runnerInput) {
@@ -55,11 +57,12 @@ public class RunnerHandler {
                                                     .messageGroupId(messageId)
                                                     .messageDeduplicationId(messageId)
                                                     .messageBody(createInput(runnerInput,
-                                                                             runnerData.getTaskConfiguration()))
+                                                                             runnerData.currentConfigurationHash()))
                                                     .build());
 
+            RunnerData runnerDataWithEc2Id = startEc2IfConfigured(runnerData);
 
-            startNewTaskIfNotRunning(runnerData, runnerInput.deploymentPlanExecutionMetadata().sfnToken(), runnerInput);
+            startNewTaskIfNotRunning(runnerDataWithEc2Id, runnerInput.deploymentPlanExecutionMetadata().sfnToken(), runnerInput);
 
 
         } catch (TaskStartFailedException e) {
@@ -81,18 +84,23 @@ public class RunnerHandler {
                   .ifPresentOrElse(taskId -> {
                       TaskStatus taskStatus = ecsFacade.getTaskStatus(
                               taskId, runnerData.getCluster());
-
                       if (taskIdHasChanged(runnerData, runnerInput)) {
+                          logger.info("Task id has changed during execution. This indicated another parallel branch has started the task.");
                           return;
                       }
                       if (taskStatus.isRunning() && configurationHasChanged(runnerData)) {
-                          logger.info("The task configuration has changed, will stop old task");
+                          logger.info("The task configuration has changed, will stop old task.");
+
                           ecsFacade.stopTask(taskId, runnerData.getCluster());
                           startTask(runnerData, sfnToken, runnerInput);
                       } else if (taskStatus.isStoppingOrStopped()) {
+                          logger.info("Ecs task is stopped, will start new task.");
                           startTask(runnerData, sfnToken, runnerInput);
                       }
-                  }, () -> startTask(runnerData, sfnToken, runnerInput));
+                  }, () -> {
+                      logger.info("No previous task id found. Starting new task.");
+                      startTask(runnerData, sfnToken, runnerInput);
+                  });
 
 
     }
@@ -108,31 +116,22 @@ public class RunnerHandler {
     }
 
     private boolean configurationHasChanged(RunnerData currentRunnerData) {
-        return !currentRunnerData.getTaskConfigurationHashCode()
-                                 .equals(currentRunnerData.getTaskConfiguration().hashCode());
+        return !currentRunnerData.previousConfigurationHash()
+                                 .equals(currentRunnerData.currentConfigurationHash());
     }
 
-    private String createInput(RunnerInput runnerInput, TaskConfiguration runnerConfig) {
+    private String createInput(RunnerInput runnerInput, Integer currentConfigHash) {
         ObjectNode mutableInput = objectMapper.valueToTree(runnerInput);
-        mutableInput.put("taskConfigHashCode", runnerConfig.hashCode());
+        mutableInput.put("taskConfigHashCode", currentConfigHash);
         return mutableInput.toString();
-    }
-
-    private RunnerData updateRunnerData(RunnerData runnerData, String taskId) {
-        RunnerData newRunnerData = runnerData.toBuilder()
-                                             .taskId(taskId)
-                                             .taskConfigurationHashCode(runnerData.getTaskConfiguration().hashCode())
-                                             .started(false)
-                                             .build();
-        stackDataDynamoFacade.saveRunnerData(newRunnerData);
-        return newRunnerData;
     }
 
 
     private TaskStatus waitForStart(String taskId, String cluster, RunnerInput runnerInput) {
         TaskStatus taskStatus = ecsFacade.getTaskStatus(taskId, cluster);
         if (taskStatus.isDead()) {
-            // sometimes when you describe right after the task is started it will return null, in that case, try again
+            // sometimes, when you describe right after the task is started, it will return null,
+            // in that case, try again
             waitFor(3);
             taskStatus = ecsFacade.getTaskStatus(taskId, cluster);
         }
@@ -150,6 +149,7 @@ public class RunnerHandler {
     }
 
     private void waitForRunnerStart(String taskId, String cluster, RunnerInput runnerInput) {
+        logger.info("Waiting for runner to start");
         for (int i = 0; i < 300; i++) {
             waitFor(2);
             RunnerData runnerData1 = stackDataDynamoFacade.getRunnerData(runnerInput.deployOriginData().getStackName(),
@@ -163,6 +163,7 @@ public class RunnerHandler {
             }
 
             if (runnerData1.isStarted()) {
+                logger.info("Task started");
                 return;
             }
 
@@ -185,20 +186,62 @@ public class RunnerHandler {
         }
     }
 
+    private RunnerData startEc2IfConfigured(RunnerData runnerData) {
+        return runnerData.getEc2()
+                         .map(ec2 -> {
+                             String instanceId = ec2.getLatestEc2InstanceId()
+                                                    .map(s -> {
+                                                        if (!ec2Facade.instanceIsRunning(s)) {
+                                                            logger.info("No ec2 instance is running. Will start new instance. ");
+                                                            return ec2Facade.startInstance(ec2, runnerData);
+                                                        }
+
+                                                        if (ec2.getConfigHashCode() != ec2.getEc2Config().hashCode()) {
+                                                            logger.info("Ec2 config has changed. Will terminate old instance");
+                                                            ec2Facade.terminateInstance(s);
+                                                            ec2Facade.waitForStop(s);
+                                                            return ec2Facade.startInstance(ec2, runnerData);
+                                                        }
+                                                        logger.info("Instance with correct config is still running. Will reuse.");
+                                                        return s;
+                                                    }).orElseGet(() -> ec2Facade.startInstance(ec2, runnerData));
+
+                             RunnerData runnerDataWithEc2Id =
+                                     runnerData.toBuilder()
+                                               .ec2(ec2.toBuilder()
+                                                       .latestEc2InstanceId(instanceId)
+                                                       .configHashCode(ec2.getEc2Config().hashCode())
+                                                       .build())
+                                               .build();
+                             stackDataDynamoFacade.saveRunnerData(runnerDataWithEc2Id);
+                             ec2Facade.waitForStart(instanceId);
+                             return runnerDataWithEc2Id;
+
+
+                         }).orElse(runnerData);
+
+
+    }
+
     private void startTask(RunnerData runnerData, String sfnToken, RunnerInput runnerInput) {
         logger.info("Starting new task");
 
-        String taskArn = ecsFacade.startTask(runnerData.getTaskConfiguration(),
-                                             runnerData.getStackName(),
-                                             runnerData.getRunnerName(),
-                                             sfnToken);
-        RunnerData updateRunnerData = updateRunnerData(runnerData, taskArn);
 
-        TaskStatus taskStatus = waitForStart(taskArn, updateRunnerData.getTaskConfiguration().cluster(), runnerInput);
+        String taskArn = ecsFacade.startTask(runnerData,
+                                             sfnToken);
+
+        RunnerData updatedRunnerData = runnerData.toBuilder()
+                                                 .taskId(taskArn)
+                                                 .started(false)
+                                                 .build();
+
+        stackDataDynamoFacade.saveRunnerData(updatedRunnerData);
+
+        TaskStatus taskStatus = waitForStart(taskArn, updatedRunnerData.getTaskConfiguration().cluster(), runnerInput);
         if (!taskStatus.isRunning()) {
             logger.error("Task failed to start");
+            updatedRunnerData.getEc2().flatMap(Ec2::getLatestEc2InstanceId).ifPresent(ec2Facade::terminateInstance);
             throw new TaskStartFailedException(taskStatus);
         }
     }
-
 }

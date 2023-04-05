@@ -32,6 +32,10 @@ class RunnerHandlerTest {
     @Mock
     private StepFunctionFacade stepFunctionFacade;
 
+    @Mock
+
+    private Ec2Facade ec2Facade;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     RunnerHandler runnerHandler;
@@ -42,7 +46,7 @@ class RunnerHandlerTest {
                                           ecsFacade,
                                           stackDataDynamoFacade,
                                           stepFunctionFacade,
-                                          objectMapper);
+                                          objectMapper, ec2Facade);
     }
 
     @Test
@@ -59,7 +63,7 @@ class RunnerHandlerTest {
                 runnerData);
         when(ecsFacade.getTaskStatus(runnerData.getTaskId().get(), runnerData.getCluster())).thenReturn(
                 TaskStatus.deadTask());
-        when(ecsFacade.startTask(any(), anyString(), anyString(), anyString())).thenReturn("my-new-id");
+        when(ecsFacade.startTask(any(), anyString())).thenReturn("my-new-id");
         when(ecsFacade.getTaskStatus("my-new-id", runnerData.getCluster())).thenReturn(new TaskStatus(
                 "RUNNING",
                 "RUNNING",
@@ -67,7 +71,7 @@ class RunnerHandlerTest {
                 null));
 
         runnerHandler.handle(runnerInput);
-        verify(ecsFacade).startTask(runnerData.getTaskConfiguration(), runnerData.getStackName() , runnerData.getRunnerName(), runnerInput.deploymentPlanExecutionMetadata().sfnToken());
+        verify(ecsFacade).startTask(runnerData, runnerInput.deploymentPlanExecutionMetadata().sfnToken());
     }
 
     @Test
@@ -89,7 +93,7 @@ class RunnerHandlerTest {
                                                                                                       null));
 
         runnerHandler.handle(runnerInput);
-        verify(ecsFacade, never()).startTask(runnerData.getTaskConfiguration(), runnerData.getStackName(), runnerData.getRunnerName(), runnerInput.deploymentPlanExecutionMetadata().sfnToken());
+        verify(ecsFacade, never()).startTask(runnerData, runnerInput.deploymentPlanExecutionMetadata().sfnToken());
     }
 
     @Test
@@ -105,7 +109,7 @@ class RunnerHandlerTest {
                                                      .build();
 
 
-        when(ecsFacade.startTask(any(), anyString(), anyString(), anyString())).thenReturn("a-new-task-id");
+        when(ecsFacade.startTask(any(), anyString())).thenReturn("a-new-task-id");
         when(stackDataDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
                 runnerData);
         when(stackDataDynamoFacade.getRunnerData(anyString(), anyString(), anyBoolean())).thenReturn(
@@ -118,7 +122,7 @@ class RunnerHandlerTest {
 
         runnerHandler.handle(runnerInput);
         verify(ecsFacade).stopTask(runnerData.getTaskId().get(), runnerData.getCluster());
-        verify(ecsFacade).startTask(taskConfiguration,runnerData.getStackName(), runnerData.getRunnerName(), runnerInput.deploymentPlanExecutionMetadata().sfnToken());
+        verify(ecsFacade).startTask(runnerData, runnerInput.deploymentPlanExecutionMetadata().sfnToken());
     }
 
 

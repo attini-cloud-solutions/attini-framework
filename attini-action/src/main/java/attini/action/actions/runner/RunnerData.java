@@ -1,5 +1,6 @@
 package attini.action.actions.runner;
 
+import java.util.Objects;
 import java.util.Optional;
 
 import attini.domain.DistributionId;
@@ -34,6 +35,8 @@ public class RunnerData {
     private final TaskConfiguration taskConfiguration;
     private final boolean started;
 
+    private final Ec2 ec2;
+
     public DistributionId getDistributionId() {
         return distributionId;
     }
@@ -58,6 +61,10 @@ public class RunnerData {
         return runnerName;
     }
 
+    public String getAttiniRunnerResourceName(){
+        return stackName + "-" + runnerName;
+    }
+
     public Optional<String> getTaskId() {
         return Optional.ofNullable(taskId);
     }
@@ -70,9 +77,14 @@ public class RunnerData {
         return taskDefinitionArn;
     }
 
-    public Integer getTaskConfigurationHashCode() {
-        return taskConfigurationHashCode;
+    public Integer previousConfigurationHash(){
+        return Objects.hash(taskConfigurationHashCode, getEc2().map(Ec2::getConfigHashCode).orElse(null));
     }
+
+    public Integer currentConfigurationHash(){
+        return Objects.hash(taskConfiguration.hashCode(), getEc2().map(o -> o.getEc2Config().hashCode()).orElse(null));
+    }
+
 
     public String getCluster() {
         return cluster == null ? "attini-default" : cluster ;
@@ -86,4 +98,7 @@ public class RunnerData {
         return started;
     }
 
+    public Optional<Ec2> getEc2() {
+        return Optional.ofNullable(ec2);
+    }
 }

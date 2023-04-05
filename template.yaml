@@ -336,6 +336,9 @@ Mappings:
       AttiniInitDeployFunction: 8
       AttiniActionFunction: 12
       AttiniStepGuardFunction: 40
+  Variables:
+    Runner:
+      Image: public.ecr.aws/attini/default-runner:attini-default-runner-1.0.7
 
 
 Resources:
@@ -428,6 +431,7 @@ Resources:
             - CreateDeploymentPlanDefaultRole
             - !GetAtt AttiniDeploymentPlanDefaultStatesServiceRole.Arn
             - !Ref AWS::NoValue
+          ATTINI_DEFAULT_RUNNER_IMAGE: !FindInMap [Variables, Runner, Image]
 
 
   AttiniDeploymentPlanSetupLogGroup:
@@ -858,6 +862,26 @@ Resources:
                       - ecs:StopTask
                     Resource: "*"
                     Effect: Allow
+                  - Action:
+                      - ec2:CreateTags
+                    Resource: "*"
+                    Effect: Allow
+                    Condition:
+                      StringEquals:
+                        ec2:CreateAction: RunInstances
+                  - Action:
+                      - ec2:TerminateInstances
+                      - ec2:RunInstances
+                    Resource: "*"
+                    Effect: Allow
+                    Condition:
+                      StringEquals:
+                        aws:ResourceTag/AttiniResourceType: RunnerInstance
+                  - Action:
+                      - ec2:DescribeInstanceStatus
+                      - ecs:DescribeContainerInstances
+                    Resource: "*"
+                    Effect: Allow
 
 
   AttiniCfnPolicy:
@@ -1077,6 +1101,20 @@ Resources:
                   - "*"
                   - - !Sub arn:aws:iam::${AWS::AccountId}:role/*${AwsServiceRolesContainsString}*
                     - !Sub arn:aws:iam::${AWS::AccountId}:role/*/*${AwsServiceRolesContainsString}*
+            - Action:
+                - iam:GetInstanceProfile
+                - iam:ListInstanceProfiles
+                - iam:ListInstanceProfileTags
+                - iam:ListInstanceProfilesForRole
+                - iam:AddRoleToInstanceProfile
+                - iam:CreateInstanceProfile
+                - iam:TagInstanceProfile
+                - iam:UntagInstanceProfile
+                - iam:DeleteInstanceProfile
+                - iam:RemoveRoleFromInstanceProfile
+              Effect: Allow
+              Resource: "*"
+
 
 
   AttiniInitDeploymentPolicy:
@@ -1741,8 +1779,69 @@ Resources:
             Resource: "*"
           - Effect: Allow
             Action:
+              - ecs:RegisterContainerInstance
+              - ecs:DeregisterContainerInstance
+              - ec2:DescribeTags
+              - ec2:DescribeInstances
+              - ecs:DiscoverPollEndpoint
+              - ecs:Poll
+              - ecs:StartTelemetrySession
+              - ecs:UpdateContainerInstancesState
+              - ecs:Submit*
+              - ecr:GetAuthorizationToken
+              - ecr:BatchCheckLayerAvailability
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+            Resource: "*"
+          - Effect: Allow
+            Action: ecs:TagResource
+            Condition:
+              StringEquals:
+                ecs:CreateAction:
+                  - CreateCluster
+                  - RegisterContainerInstance
+            Resource: '*'
+          - Effect: Allow
+            Action:
               - lambda:InvokeFunction
             Resource: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:attini-step-guard
+          - Effect: Allow
+            Action:
+              - ec2:TerminateInstances
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:ResourceTag/AttiniResourceType: RunnerInstance
+          - # Permissions required by SSM to manage the Runner EC2 Instance,
+            # this access is the same as AmazonSSMManagedInstanceCore managed policy.
+            Effect: Allow
+            Action:
+              - ssm:DescribeAssociation
+              - ssm:GetDeployablePatchSnapshotForInstance
+              - ssm:GetDocument
+              - ssm:DescribeDocument
+              - ssm:GetManifest
+              - ssm:GetParameter
+              - ssm:GetParameters
+              - ssm:ListAssociations
+              - ssm:ListInstanceAssociations
+              - ssm:PutInventory
+              - ssm:PutComplianceItems
+              - ssm:PutConfigurePackageResult
+              - ssm:UpdateAssociationStatus
+              - ssm:UpdateInstanceAssociationStatus
+              - ssm:UpdateInstanceInformation
+              - ssmmessages:CreateControlChannel
+              - ssmmessages:CreateDataChannel
+              - ssmmessages:OpenControlChannel
+              - ssmmessages:OpenDataChannel
+              - ec2messages:AcknowledgeMessage
+              - ec2messages:DeleteMessage
+              - ec2messages:FailMessage
+              - ec2messages:GetEndpoint
+              - ec2messages:GetMessages
+              - ec2messages:SendReply
+            Resource: '*'
 
   AttiniCliUser:
     Type: AWS::IAM::ManagedPolicy
@@ -1801,7 +1900,7 @@ Resources:
     Properties:
       ContainerDefinitions:
         - Name: attini-default-container
-          Image: public.ecr.aws/attini/default-runner:attini-default-runner-1.0.6
+          Image: !FindInMap [Variables, Runner, Image]
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -1822,6 +1921,13 @@ Resources:
       Tags:
         - Key: Attini
           Value: "-"
+
+  RunnerDefaultInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub attini-runner-default-instance-profile-${AWS::Region}
+      Roles:
+        - !Ref AttiniDefaultRunnerRole
 
   AttiniDefaultRunnerLogGroup:
     Type: AWS::Logs::LogGroup
@@ -1849,7 +1955,9 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: ecs-tasks.amazonaws.com
+              Service:
+                - ecs-tasks.amazonaws.com
+                - ec2.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
         !If
