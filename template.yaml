@@ -1924,8 +1924,11 @@ Resources:
 
   RunnerDefaultInstanceProfile:
     Type: AWS::IAM::InstanceProfile
+    DependsOn:
+      - AttiniAutoUpdatePolicy
     Properties:
       InstanceProfileName: !Sub attini-runner-default-instance-profile-${AWS::Region}
+      Path: /attini/
       Roles:
         - !Ref AttiniDefaultRunnerRole
 
