@@ -37,6 +37,9 @@ public final class TaskConfiguration {
 
     private final String roleArn;
 
+    private final Integer cpu;
+    private final Integer memory;
+
 
     public Set<String> subnets() {
         return subnets;
@@ -77,11 +80,19 @@ public final class TaskConfiguration {
         return installationCommands == null ? Collections.emptyList() : installationCommands;
     }
 
-    public String getAttiniVersion() {
+    public String attiniVersion() {
         return attiniVersion;
     }
 
-    public Optional<String> getRoleArn() {
+    public Optional<String> roleArn() {
         return Optional.ofNullable(roleArn);
+    }
+
+    public Optional<Integer> cpu() {
+        return Optional.ofNullable(cpu);
+    }
+
+    public Optional<Integer> memory() {
+        return Optional.ofNullable(memory);
     }
 }

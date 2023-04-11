@@ -72,36 +72,36 @@ public class AttiniRunners {
                                                                           .isMissingNode() ? CfnString.create(Resources.getDefaultTaskDefinitionArn(
                                             region,
                                             accountId)) : CfnString.create(jsonNode.path("TaskDefinitionArn"));
-                                    Runner.RunnerBuilder runnerBuilder = Runner.builder()
-                                                                               .name(entry.getKey())
-                                                                               .installationCommands(commands)
-                                                                               .installationCommandsTimeout(CfnString.create(
-                                                                                       jsonNode.path("Startup")
-                                                                                               .path("CommandsTimeout")))
-                                                                               .containerName(CfnString.create(jsonNode.path(
-                                                                                       "ContainerName")))
-                                                                               .cluster(CfnString.create(jsonNode.path(
-                                                                                       "EcsCluster")))
-                                                                               .roleArn(CfnString.create(jsonNode.path(
-                                                                                       "RoleArn")))
-                                                                               .taskDefinitionArn(taskDefinitionArn)
-                                                                               .idleTimeToLive(CfnString.create(jsonNode.path(
-                                                                                                                                "RunnerConfiguration")
-                                                                                                                        .path("IdleTimeToLive")))
-                                                                               .jobTimeout(CfnString.create(jsonNode.path(
-                                                                                                                            "RunnerConfiguration")
-                                                                                                                    .path("JobTimeout")))
-                                                                               .logLevel(CfnString.create(jsonNode.path(
-                                                                                                                          "RunnerConfiguration")
-                                                                                                                  .path("LogLevel")))
-                                                                               .maxConcurrentJobs(CfnString.create(
-                                                                                       jsonNode.path(
-                                                                                                       "RunnerConfiguration")
-                                                                                               .path("MaxConcurrentJobs")))
-                                                                               .queueUrl(CfnString.create(createJsonNode(
-                                                                                       "{\"Fn::GetAtt\" : \"" + getQueueName(
-                                                                                               entry.getKey()) + ".QueueUrl\"}",
-                                                                                       objectMapper)));
+                                    Runner.RunnerBuilder runnerBuilder =
+                                            Runner.builder()
+                                                  .name(entry.getKey())
+                                                  .installationCommands(commands)
+                                                  .installationCommandsTimeout(CfnString.create(
+                                                          jsonNode.path("Startup")
+                                                                  .path("CommandsTimeout")))
+                                                  .containerName(CfnString.create(jsonNode.path(
+                                                          "ContainerName")))
+                                                  .cluster(CfnString.create(jsonNode.path(
+                                                          "EcsCluster")))
+                                                  .roleArn(CfnString.create(jsonNode.path(
+                                                          "RoleArn")))
+                                                  .taskDefinitionArn(taskDefinitionArn)
+                                                  .idleTimeToLive(CfnString.create(jsonNode.path("RunnerConfiguration")
+                                                                                           .path("IdleTimeToLive")))
+                                                  .jobTimeout(CfnString.create(jsonNode.path("RunnerConfiguration")
+                                                                                       .path("JobTimeout")))
+                                                  .logLevel(CfnString.create(jsonNode.path("RunnerConfiguration")
+                                                                                     .path("LogLevel")))
+                                                  .maxConcurrentJobs(CfnString.create(jsonNode.path(
+                                                                                                      "RunnerConfiguration")
+                                                                                              .path("MaxConcurrentJobs")))
+                                                  .queueUrl(CfnString.create(createJsonNode(
+                                                          "{\"Fn::GetAtt\" : \"" + getQueueName(
+                                                                  entry.getKey()) + ".QueueUrl\"}",
+                                                          objectMapper)))
+                                                  .memory(CfnString.create(jsonNode.path(
+                                                          "Memory")))
+                                                  .cpu(CfnString.create(jsonNode.path("Cpu")));
 
                                     if (jsonNode.path("AwsVpcConfiguration").isMissingNode()) {
                                         List<String> subnets = getSubnets(ec2Client);
@@ -161,9 +161,12 @@ public class AttiniRunners {
                                         String ecsClientLogGroup = entry.getKey() + "EcsClientLogGroup";
                                         taskDefinitions.put(ecsClientLogGroup, Resources.logGroup());
 
+                                        JsonNode ec2Configuration = jsonNode.path("Ec2Configuration");
                                         runnerBuilder
                                                 .ec2Configuration(Ec2Configuration
                                                                           .builder()
+                                                                          .imageId(CfnString.create(ec2Configuration
+                                                                                                            .path("ImageId")))
                                                                           .ecsClientLogGroup(CfnString.create(
                                                                                   objectMapper.valueToTree(
                                                                                           Map.of("Ref",
@@ -171,10 +174,10 @@ public class AttiniRunners {
                                                                           .instanceProfile(
                                                                                   createDefaultInstanceProfileRef(
                                                                                           objectMapper,
-                                                                                          jsonNode.path("Ec2Configuration")
+                                                                                          ec2Configuration
                                                                                                   .path("InstanceProfileName")))
                                                                           .instanceType(CfnString.create(
-                                                                                  jsonNode.path("Ec2Configuration")
+                                                                                  ec2Configuration
                                                                                           .path("InstanceType")))
                                                                           .build());
                                         if (jsonNode.path("Image").isMissingNode()) {

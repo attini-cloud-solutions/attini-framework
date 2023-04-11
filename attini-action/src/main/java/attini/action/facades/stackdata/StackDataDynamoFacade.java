@@ -90,6 +90,7 @@ public class StackDataDynamoFacade implements StackDataFacade {
         map.put("taskConfigHashCode", toStringUpdateAttribute(String.valueOf(runnerData.getTaskConfiguration().hashCode())));
         map.put("cluster", toStringUpdateAttribute(runnerData.getTaskConfiguration().cluster()));
 
+        runnerData.getStartedByExecutionArn().ifPresent(sfnExecutionArn -> map.put("startedByExecutionArn", toStringUpdateAttribute(sfnExecutionArn.asString())));
         runnerData.getEc2().ifPresent(ec2 -> map.put("ec2ConfigHashCode", toStringUpdateAttribute(String.valueOf(ec2.getConfigHashCode()))));
         runnerData.getEc2().flatMap(Ec2::getLatestEc2InstanceId).ifPresent(s -> map.put("latestEc2InstanceId", toStringUpdateAttribute(s)));
         runnerData.getContainer().ifPresent(s -> map.put("container", toStringUpdateAttribute(s)));

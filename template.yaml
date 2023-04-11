@@ -872,6 +872,7 @@ Resources:
                   - Action:
                       - ec2:TerminateInstances
                       - ec2:RunInstances
+                      - ec2:DescribeImages
                     Resource: "*"
                     Effect: Allow
                     Condition:
@@ -1667,6 +1668,16 @@ Resources:
               - ecs:RegisterTaskDefinition
               - ecs:DeregisterTaskDefinition
               - ecs:CreateCluster
+              - iam:GetInstanceProfile
+              - iam:ListInstanceProfiles
+              - iam:ListInstanceProfilesForRole
+              - iam:ListInstanceProfileTags
+              - iam:AddRoleToInstanceProfile
+              - iam:CreateInstanceProfile
+              - iam:TagInstanceProfile
+              - iam:UntagInstanceProfile
+              - iam:DeleteInstanceProfile
+              - iam:RemoveRoleFromInstanceProfile
             Effect: Allow
             Resource: "*"
           - Action:

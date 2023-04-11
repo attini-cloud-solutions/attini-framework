@@ -31,6 +31,10 @@ final class TaskStatus {
         return SHUT_DOWN_STATUSES.contains(desiredStatus);
     }
 
+    public boolean isRunningOrStarting(){
+        return  isRunning() || isStarting();
+    }
+
     public boolean isStarting() {
         return lastStatus != null && STARTING_STATUSES.contains(lastStatus);
     }

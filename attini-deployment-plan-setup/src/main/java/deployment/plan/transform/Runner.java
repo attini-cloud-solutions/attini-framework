@@ -36,6 +36,9 @@ public class Runner {
     private final CfnString installationCommandsTimeout;
     private final Ec2Configuration ec2Configuration;
 
+    private final CfnString cpu;
+    private final CfnString memory;
+
 
     public String getName() {
         return name;
@@ -102,5 +105,13 @@ public class Runner {
 
     public Optional<Ec2Configuration> getEc2Configuration() {
         return Optional.ofNullable(ec2Configuration);
+    }
+
+    public CfnString getCpu() {
+        return cpu;
+    }
+
+    public CfnString getMemory() {
+        return memory;
     }
 }

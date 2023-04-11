@@ -3,6 +3,7 @@ package attini.action.actions.runner;
 import java.util.Objects;
 import java.util.Optional;
 
+import attini.action.actions.deploycloudformation.SfnExecutionArn;
 import attini.domain.DistributionId;
 import attini.domain.DistributionName;
 import attini.domain.Environment;
@@ -36,6 +37,8 @@ public class RunnerData {
     private final boolean started;
 
     private final Ec2 ec2;
+
+    private SfnExecutionArn startedByExecutionArn;
 
     public DistributionId getDistributionId() {
         return distributionId;
@@ -100,5 +103,9 @@ public class RunnerData {
 
     public Optional<Ec2> getEc2() {
         return Optional.ofNullable(ec2);
+    }
+
+    public Optional<SfnExecutionArn> getStartedByExecutionArn() {
+        return Optional.ofNullable(startedByExecutionArn);
     }
 }

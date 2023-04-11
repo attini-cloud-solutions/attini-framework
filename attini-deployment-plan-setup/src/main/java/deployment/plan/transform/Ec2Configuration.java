@@ -21,11 +21,14 @@ public class Ec2Configuration {
 
     private final CfnString instanceProfile;
 
+    private final CfnString imageId;
+
     @JsonCreator
-    public Ec2Configuration(CfnString instanceType, CfnString ecsClientLogGroup, CfnString instanceProfile) {
+    public Ec2Configuration(CfnString instanceType, CfnString ecsClientLogGroup, CfnString instanceProfile, CfnString imageId) {
         this.instanceType = instanceType;
         this.ecsClientLogGroup = ecsClientLogGroup;
         this.instanceProfile = instanceProfile;
+        this.imageId = imageId;
     }
 
     public CfnString getInstanceType() {
@@ -38,5 +41,9 @@ public class Ec2Configuration {
 
     public CfnString getInstanceProfile() {
         return instanceProfile;
+    }
+
+    public CfnString getImageId() {
+        return imageId;
     }
 }

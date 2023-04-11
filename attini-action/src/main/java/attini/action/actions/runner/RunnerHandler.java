@@ -10,6 +10,7 @@ import org.jboss.logging.Logger;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import attini.action.actions.deploycloudformation.SfnExecutionArn;
 import attini.action.actions.runner.input.RunnerInput;
 import attini.action.facades.stackdata.StackDataDynamoFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
@@ -62,14 +63,11 @@ public class RunnerHandler {
 
             RunnerData runnerDataWithEc2Id = startEc2IfConfigured(runnerData);
 
-            startNewTaskIfNotRunning(runnerDataWithEc2Id, runnerInput.deploymentPlanExecutionMetadata().sfnToken(), runnerInput);
+            startNewTaskIfNotRunning(runnerDataWithEc2Id,
+                                     runnerInput.deploymentPlanExecutionMetadata().sfnToken(),
+                                     runnerInput);
 
 
-        } catch (TaskStartFailedException e) {
-            logger.error("TaskStartFailed", e);
-            stepFunctionFacade.sendError(runnerInput.deploymentPlanExecutionMetadata().sfnToken(),
-                                         e.getTaskStatus().stopReason(),
-                                         e.getTaskStatus().stopCode().map(Enum::name).orElse("unknown stop code"));
         } catch (IllegalArgumentException e) {
             logger.error("Illegal argument", e);
             stepFunctionFacade.sendError(runnerInput.deploymentPlanExecutionMetadata().sfnToken(),
@@ -79,40 +77,62 @@ public class RunnerHandler {
     }
 
     private void startNewTaskIfNotRunning(RunnerData runnerData, String sfnToken, RunnerInput runnerInput) {
+        try {
+            runnerData.getTaskId()
+                      .ifPresentOrElse(taskId -> {
 
-        runnerData.getTaskId()
-                  .ifPresentOrElse(taskId -> {
-                      TaskStatus taskStatus = ecsFacade.getTaskStatus(
-                              taskId, runnerData.getCluster());
-                      if (taskIdHasChanged(runnerData, runnerInput)) {
-                          logger.info("Task id has changed during execution. This indicated another parallel branch has started the task.");
-                          return;
-                      }
-                      if (taskStatus.isRunning() && configurationHasChanged(runnerData)) {
-                          logger.info("The task configuration has changed, will stop old task.");
+                          Optional<SfnExecutionArn> startedByExecutionArn =
+                                  stackDataDynamoFacade.getRunnerData(runnerInput.deployOriginData()
+                                                                                 .getStackName(),
+                                                                      runnerInput.properties()
+                                                                                 .runner(),
+                                                                      true)
+                                                       .getStartedByExecutionArn();
 
-                          ecsFacade.stopTask(taskId, runnerData.getCluster());
+                          if (runnerInput.deploymentPlanExecutionMetadata()
+                                         .executionArn()
+                                         .equals(startedByExecutionArn.orElse(null))) {
+                              logger.info(
+                                      "The current running task was started by the current execution id, this indicated that it was started by a parallel branch and no task should be started.");
+                              return;
+                          }
+
+                          if (!runnerData.getStartedByExecutionArn().equals(startedByExecutionArn)) {
+                              String message = "Parallel executions detected. Aborting current execution.";
+                              logger.warn(message);
+                              throw new TaskStartFailedSyncException(message);
+                          }
+                          TaskStatus taskStatus = ecsFacade.getTaskStatus(
+                                  taskId, runnerData.getCluster());
+
+                          if (taskStatus.isRunningOrStarting() && configurationHasChanged(runnerData)) {
+                              logger.info("The task configuration has changed, will stop old task.");
+
+                              ecsFacade.stopTask(taskId, runnerData.getCluster());
+                              startTask(runnerData, sfnToken, runnerInput);
+                          } else if (taskStatus.isStoppingOrStopped()) {
+                              logger.info("Ecs task is stopped, will start new task.");
+                              startTask(runnerData, sfnToken, runnerInput);
+                          }
+                      }, () -> {
+                          logger.info("No previous task id found. Starting new task.");
                           startTask(runnerData, sfnToken, runnerInput);
-                      } else if (taskStatus.isStoppingOrStopped()) {
-                          logger.info("Ecs task is stopped, will start new task.");
-                          startTask(runnerData, sfnToken, runnerInput);
-                      }
-                  }, () -> {
-                      logger.info("No previous task id found. Starting new task.");
-                      startTask(runnerData, sfnToken, runnerInput);
-                  });
+                      });
+        } catch (TaskStartFailedException e) {
+            logger.error("Staring ECS Task failed async", e);
+            runnerData.getEc2().flatMap(Ec2::getLatestEc2InstanceId).ifPresent(ec2Facade::terminateInstance);
+            stepFunctionFacade.sendError(runnerInput.deploymentPlanExecutionMetadata().sfnToken(),
+                                         e.getTaskStatus().stopReason(),
+                                         e.getTaskStatus().stopCode().map(Enum::name).orElse("unknown stop code"));
+        } catch (TaskStartFailedSyncException e) {
+            logger.error("Staring ECS Task failed sync", e);
+            runnerData.getEc2().flatMap(Ec2::getLatestEc2InstanceId).ifPresent(ec2Facade::terminateInstance);
+            stepFunctionFacade.sendError(runnerInput.deploymentPlanExecutionMetadata().sfnToken(),
+                                         e.getMessage(),
+                                         "TaskFailedToStart");
+        }
 
 
-    }
-
-    private boolean taskIdHasChanged(RunnerData runnerData, RunnerInput runnerInput) {
-        Optional<String> currentTaskId = stackDataDynamoFacade.getRunnerData(runnerInput.deployOriginData()
-                                                                                        .getStackName(),
-                                                                             runnerInput.properties()
-                                                                                        .runner(), true)
-                                                              .getTaskId();
-
-        return !runnerData.getTaskId().equals(currentTaskId);
     }
 
     private boolean configurationHasChanged(RunnerData currentRunnerData) {
@@ -192,17 +212,20 @@ public class RunnerHandler {
                              String instanceId = ec2.getLatestEc2InstanceId()
                                                     .map(s -> {
                                                         if (!ec2Facade.instanceIsRunning(s)) {
-                                                            logger.info("No ec2 instance is running. Will start new instance. ");
+                                                            logger.info(
+                                                                    "No ec2 instance is running. Will start new instance. ");
                                                             return ec2Facade.startInstance(ec2, runnerData);
                                                         }
 
                                                         if (ec2.getConfigHashCode() != ec2.getEc2Config().hashCode()) {
-                                                            logger.info("Ec2 config has changed. Will terminate old instance");
+                                                            logger.info(
+                                                                    "Ec2 config has changed. Will terminate old instance");
                                                             ec2Facade.terminateInstance(s);
                                                             ec2Facade.waitForStop(s);
                                                             return ec2Facade.startInstance(ec2, runnerData);
                                                         }
-                                                        logger.info("Instance with correct config is still running. Will reuse.");
+                                                        logger.info(
+                                                                "Instance with correct config is still running. Will reuse.");
                                                         return s;
                                                     }).orElseGet(() -> ec2Facade.startInstance(ec2, runnerData));
 
@@ -231,6 +254,8 @@ public class RunnerHandler {
                                              sfnToken);
 
         RunnerData updatedRunnerData = runnerData.toBuilder()
+                                                 .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
+                                                                                   .executionArn())
                                                  .taskId(taskArn)
                                                  .started(false)
                                                  .build();
@@ -240,7 +265,6 @@ public class RunnerHandler {
         TaskStatus taskStatus = waitForStart(taskArn, updatedRunnerData.getTaskConfiguration().cluster(), runnerInput);
         if (!taskStatus.isRunning()) {
             logger.error("Task failed to start");
-            updatedRunnerData.getEc2().flatMap(Ec2::getLatestEc2InstanceId).ifPresent(ec2Facade::terminateInstance);
             throw new TaskStartFailedException(taskStatus);
         }
     }
