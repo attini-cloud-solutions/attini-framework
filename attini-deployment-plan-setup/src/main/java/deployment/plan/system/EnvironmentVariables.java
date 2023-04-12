@@ -28,4 +28,8 @@ public class EnvironmentVariables {
         return System.getenv("ATTINI_VERSION");
     }
 
+    public String getDefaultRunnerImage(){
+        return System.getenv("ATTINI_DEFAULT_RUNNER_IMAGE");
+    }
+
 }

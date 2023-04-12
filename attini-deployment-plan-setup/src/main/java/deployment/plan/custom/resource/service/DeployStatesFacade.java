@@ -64,7 +64,8 @@ public class DeployStatesFacade {
         try {
             item.put("payloadDefaults",
                      AttributeValue.builder()
-                                   .s(objectMapper.writeValueAsString(deploymentPlanResourceState.getPayloadDefaults())).build());
+                                   .s(objectMapper.writeValueAsString(deploymentPlanResourceState.getPayloadDefaults()))
+                                   .build());
         } catch (JsonProcessingException e) {
             throw new UncheckedIOException(e);
         }
@@ -95,6 +96,7 @@ public class DeployStatesFacade {
                                              .build());
 
     }
+
     public void saveRunnerState(Runner runner, DeploymentPlanResourceState deploymentPlanResourceState) {
 
         Map<String, AttributeValueUpdate> map = new HashMap<>();
@@ -125,6 +127,9 @@ public class DeployStatesFacade {
         map.put("startupCommandsTimeout",
                 updateNullableCfnNumber(runner.getInstallationCommandsTimeout(), "CommandsTimeout"));
         map.put("attiniVersion", stringUpdateAttribute(environmentVariables.getAttiniVersion()));
+        map.put("cpu", updateNullableCfnNumber(runner.getCpu(), "Cpu"));
+        map.put("memory", updateNullableCfnNumber(runner.getMemory(), "Memory"));
+
         if (!runner.getInstallationCommands().isEmpty()) {
             map.put("startupCommands",
                     AttributeValueUpdate.builder()
@@ -141,6 +146,38 @@ public class DeployStatesFacade {
         } else {
             map.put("startupCommands", AttributeValueUpdate.builder().action(AttributeAction.DELETE).build());
         }
+
+        runner.getEc2Configuration()
+              .ifPresentOrElse(ec2Configuration -> {
+                                   Map<String, AttributeValue> ec2CondigMap = new HashMap<>();
+                                   ec2CondigMap.put("instanceType", AttributeValue.builder()
+                                                                                  .s(ec2Configuration.getInstanceType()
+                                                                                                     .asString())
+                                                                                  .build());
+                                   ec2CondigMap.put("instanceProfile", AttributeValue.builder()
+                                                                                     .s(ec2Configuration.getInstanceProfile()
+                                                                                                        .asString())
+                                                                                     .build());
+                                   ec2CondigMap.put("ecsClientLogGroup", AttributeValue.builder()
+                                                                                       .s(ec2Configuration.getEcsClientLogGroup()
+                                                                                                          .asString())
+                                                                                       .build());
+
+                                   if (ec2Configuration.getImageId() != null) {
+                                       ec2CondigMap.put("imageId",
+                                                        AttributeValue.builder().s(ec2Configuration.getImageId().asString()).build());
+                                   }
+                                   map.put("ec2Configuration",
+                                           AttributeValueUpdate.builder()
+                                                               .value(AttributeValue.builder()
+                                                                                    .m(ec2CondigMap)
+                                                                                    .build())
+                                                               .build());
+                               },
+                               () -> map.put("ec2Configuration",
+                                             AttributeValueUpdate.builder()
+                                                                 .action(AttributeAction.DELETE)
+                                                                 .build()));
 
         dynamoDbClient.updateItem(UpdateItemRequest.builder()
                                                    .tableName(environmentVariables.getResourceStatesTableName())
@@ -187,7 +224,9 @@ public class DeployStatesFacade {
         return stringUpdateAttribute(cfnString.asString());
     }
 
-    private AttributeValueUpdate updateCfnStringWithDefault(CfnString cfnString, String fieldName, String defaultValue) {
+    private AttributeValueUpdate updateCfnStringWithDefault(CfnString cfnString,
+                                                            String fieldName,
+                                                            String defaultValue) {
         if (cfnString == null) {
             return stringUpdateAttribute(defaultValue);
         }

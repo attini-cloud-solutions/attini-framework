@@ -2,6 +2,7 @@ package deployment.plan.transform;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -15,7 +16,7 @@ import lombok.ToString;
 @EqualsAndHashCode
 @RegisterForReflection
 @ToString
-@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonInclude(JsonInclude.Include.NON_ABSENT)
 public class Runner {
 
     private final String name;
@@ -33,6 +34,10 @@ public class Runner {
     private final CfnString roleArn;
     private final List<CfnString> installationCommands;
     private final CfnString installationCommandsTimeout;
+    private final Ec2Configuration ec2Configuration;
+
+    private final CfnString cpu;
+    private final CfnString memory;
 
 
     public String getName() {
@@ -96,5 +101,17 @@ public class Runner {
 
     public List<CfnString> getInstallationCommands() {
         return installationCommands == null ? Collections.emptyList() : installationCommands;
+    }
+
+    public Optional<Ec2Configuration> getEc2Configuration() {
+        return Optional.ofNullable(ec2Configuration);
+    }
+
+    public CfnString getCpu() {
+        return cpu;
+    }
+
+    public CfnString getMemory() {
+        return memory;
     }
 }

@@ -15,6 +15,7 @@ import java.util.Optional;
 import org.jboss.logging.Logger;
 
 import attini.action.actions.deploycloudformation.SfnExecutionArn;
+import attini.action.actions.runner.Ec2;
 import attini.domain.DeployOriginData;
 import attini.action.actions.deploycloudformation.stackconfig.StackConfiguration;
 import attini.action.actions.deploycloudformation.StackData;
@@ -86,9 +87,12 @@ public class StackDataDynamoFacade implements StackDataFacade {
         runnerData.getTaskId().ifPresent(s -> map.put("taskId", toStringUpdateAttribute(s)));
         map.put("taskDefinitionArn", toStringUpdateAttribute(runnerData.getTaskDefinitionArn()));
         map.put("started", AttributeValueUpdate.builder().value(AttributeValue.builder().bool(false).build()).build());
-        map.put("taskConfigHashCode",
-                toStringUpdateAttribute(String.valueOf(runnerData.getTaskConfigurationHashCode())));
+        map.put("taskConfigHashCode", toStringUpdateAttribute(String.valueOf(runnerData.getTaskConfiguration().hashCode())));
         map.put("cluster", toStringUpdateAttribute(runnerData.getTaskConfiguration().cluster()));
+
+        runnerData.getStartedByExecutionArn().ifPresent(sfnExecutionArn -> map.put("startedByExecutionArn", toStringUpdateAttribute(sfnExecutionArn.asString())));
+        runnerData.getEc2().ifPresent(ec2 -> map.put("ec2ConfigHashCode", toStringUpdateAttribute(String.valueOf(ec2.getConfigHashCode()))));
+        runnerData.getEc2().flatMap(Ec2::getLatestEc2InstanceId).ifPresent(s -> map.put("latestEc2InstanceId", toStringUpdateAttribute(s)));
         runnerData.getContainer().ifPresent(s -> map.put("container", toStringUpdateAttribute(s)));
 
         dynamoDbClient.updateItem(UpdateItemRequest.builder()

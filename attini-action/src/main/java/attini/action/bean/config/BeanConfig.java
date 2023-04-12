@@ -19,6 +19,7 @@ import attini.action.actions.deploycloudformation.stackconfig.StackConfiguration
 import attini.action.actions.deploycloudformation.stackconfig.StackConfigurationService;
 import attini.action.actions.getdeployorigindata.GetDeployOriginDataHandler;
 import attini.action.actions.readoutput.ImportHandler;
+import attini.action.actions.runner.Ec2Facade;
 import attini.action.actions.runner.EcsFacade;
 import attini.action.actions.runner.RunnerHandler;
 import attini.action.configuration.InitDeployConfigurationHandler;
@@ -46,6 +47,7 @@ import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudformation.CloudFormationClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ecs.EcsClient;
 import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.organizations.OrganizationsClient;
@@ -109,14 +111,23 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
+    Ec2Facade ec2Facade(EnvironmentVariables environmentVariables, @CustomAwsClient SsmClient ssmClient,
+                        ObjectMapper objectMapper) {
+        return new Ec2Facade(Ec2Client.builder()
+                                      .httpClient(UrlConnectionHttpClient.builder().build())
+                                      .build(), environmentVariables, ssmClient, objectMapper);
+    }
+
+    @ApplicationScoped
     public RunnerHandler runnerHandler(SqsClient sqsClient,
                                        StackDataDynamoFacade stackDataDynamoFacade,
                                        StepFunctionFacade stepFunctionFacade,
-                                       EcsFacade ecsFacade, ObjectMapper objectMapper) {
+                                       EcsFacade ecsFacade, ObjectMapper objectMapper,
+                                       Ec2Facade ec2Facade) {
         return new RunnerHandler(sqsClient,
                                  ecsFacade,
                                  stackDataDynamoFacade,
-                                 stepFunctionFacade, objectMapper);
+                                 stepFunctionFacade, objectMapper, ec2Facade);
     }
 
     @ApplicationScoped
@@ -139,18 +150,24 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
+    @CustomAwsClient
+    public SsmClient ssmClient(EnvironmentVariables environmentVariables){
+        String region = environmentVariables.getRegion();
+        return  SsmClient.builder()
+                         .region(Region.of(region))
+                         .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                         .overrideConfiguration(createClientOverrideConfiguration())
+                         .httpClient(UrlConnectionHttpClient.builder().build())
+                         .endpointOverride(getAwsServiceEndpoint("ssm", region))
+                         .build();
+    }
+
+    @ApplicationScoped
     public StackConfigurationService stackConfigurationService(StackConfigurationFileService stackConfigurationFileService,
                                                                CloudFormationClientFactory cloudFormationClientFactory,
                                                                EnvironmentVariables environmentVariables,
-                                                               InitStackDataFacade initStackDataFacade) {
-        String region = environmentVariables.getRegion();
-        SsmClient ssmClient = SsmClient.builder()
-                                       .region(Region.of(region))
-                                       .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
-                                       .overrideConfiguration(createClientOverrideConfiguration())
-                                       .httpClient(UrlConnectionHttpClient.builder().build())
-                                       .endpointOverride(getAwsServiceEndpoint("ssm", region))
-                                       .build();
+                                                               InitStackDataFacade initStackDataFacade,
+                                                               @CustomAwsClient SsmClient ssmClient) {
         return new StackConfigurationService(
                 stackConfigurationFileService,
                 cloudFormationClientFactory,

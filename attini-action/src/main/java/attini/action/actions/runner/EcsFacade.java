@@ -19,6 +19,8 @@ import software.amazon.awssdk.services.ecs.model.InvalidParameterException;
 import software.amazon.awssdk.services.ecs.model.KeyValuePair;
 import software.amazon.awssdk.services.ecs.model.LaunchType;
 import software.amazon.awssdk.services.ecs.model.NetworkConfiguration;
+import software.amazon.awssdk.services.ecs.model.PlacementConstraint;
+import software.amazon.awssdk.services.ecs.model.PlacementConstraintType;
 import software.amazon.awssdk.services.ecs.model.PropagateTags;
 import software.amazon.awssdk.services.ecs.model.RunTaskRequest;
 import software.amazon.awssdk.services.ecs.model.RunTaskResponse;
@@ -71,8 +73,13 @@ public class EcsFacade {
 
     }
 
-    public String startTask(TaskConfiguration runnerConfig, String stackName, String runnerName, String sfnToken) {
+    public String startTask(RunnerData runnerData,
+                            String sfnToken) {
 
+
+        TaskConfiguration runnerConfig = runnerData.getTaskConfiguration();
+
+        boolean isEc2Task = runnerData.getEc2().isPresent();
         NetworkConfiguration networkConfiguration =
                 NetworkConfiguration
                         .builder()
@@ -86,27 +93,43 @@ public class EcsFacade {
 
 
         RunTaskRequest.Builder builder = RunTaskRequest.builder()
-                                                       .launchType(LaunchType.FARGATE)
-                                                       .networkConfiguration(networkConfiguration)
+                                                       .enableECSManagedTags(isEc2Task)
+
+                                                       .launchType(isEc2Task ? LaunchType.EC2 : LaunchType.FARGATE)
                                                        .propagateTags(PropagateTags.TASK_DEFINITION)
                                                        .taskDefinition(runnerConfig.taskDefinitionArn())
                                                        .cluster(runnerConfig.cluster())
-                                                       .overrides(getOverrides(runnerConfig,
-                                                                               stackName,
-                                                                               runnerName,
+                                                       .overrides(getOverrides(runnerData,
                                                                                sfnToken));
 
+        if (isEc2Task) {
+            builder.placementConstraints(PlacementConstraint.builder()
+                                                            .type(PlacementConstraintType.MEMBER_OF)
+                                                            .expression("attribute:runnerResourceName == " + runnerData.getAttiniRunnerResourceName())
+                                                            .build());
+        }
 
+        if (!isEc2Task) {
+            builder.networkConfiguration(networkConfiguration);
+        }
         RunTaskResponse runTaskResponse = ecsClient.runTask(builder.build());
 
 
+        if (!runTaskResponse.failures().isEmpty()){
+            logger.error("Ecs tasks failed to start");
+            runTaskResponse.failures().forEach(logger::error);
+        }
+
+        if (runTaskResponse.tasks().isEmpty()){
+            throw new TaskStartFailedSyncException("Ecs task failed to start. Reason: " + runTaskResponse.failures());
+        }
         return runTaskResponse.tasks().get(0).taskArn();
     }
 
-    private TaskOverride getOverrides(TaskConfiguration taskConfig,
-                                      String stackName,
-                                      String runnerName,
+    private TaskOverride getOverrides(RunnerData runnerData,
                                       String sfnToken) {
+
+        TaskConfiguration taskConfig = runnerData.getTaskConfiguration();
 
         String containerName = taskConfig.container().orElseGet(() -> {
             List<ContainerDefinition> containerDefinitions = ecsClient.describeTaskDefinition(
@@ -133,9 +156,9 @@ public class EcsFacade {
                                       toEnvVariable("ATTINI_RESOURCE_STATE_TABLE",
                                                     environmentVariables.getResourceStatesTableName()),
                                       toEnvVariable("ATTINI_CONFIGURATION_HASH",
-                                                    String.valueOf(taskConfig.hashCode())),
+                                                    String.valueOf(runnerData.currentConfigurationHash())),
                                       toEnvVariable("ATTINI_RUNNER_RESOURCE_NAME",
-                                                    stackName + "-" + runnerName),
+                                                    runnerData.getAttiniRunnerResourceName()),
                                       toEnvVariable("ATTINI_DISABLE_ANSI_COLOR",
                                                     "true"),
                                       toEnvVariable("ATTINI_AWS_ACCOUNT", environmentVariables.getAccountId()),
@@ -175,17 +198,26 @@ public class EcsFacade {
                                              logLevel.name()))
                   );
 
+        runnerData.getEc2()
+                  .flatMap(Ec2::getLatestEc2InstanceId)
+                  .ifPresent(s -> variables.add(toEnvVariable("ATTINI_EC2_INSTANCE_ID", s)));
+
+
+        ContainerOverride.Builder containterOverridesBuilder = ContainerOverride.builder()
+                                                                 .name(containerName)
+                                                                 .command("/bin/bash",
+                                                                          "-c",
+                                                                          getStartupCommand(sfnToken, "1.3.0"))
+                                                                 .environment(variables);
+
 
         TaskOverride.Builder builder = TaskOverride.builder()
-                                                   .containerOverrides(ContainerOverride.builder()
-                                                                                        .name(containerName)
-                                                                                        .command("/bin/bash",
-                                                                                                 "-c",
-                                                                                                 "attini-runner dry-run > /dev/null 2>&1; if [ $? -eq 127 ]; then echo \"attini-runner not found so installing it.\"; curl -sfL#o $HOME/attini-runner https://docs.attini.io/api/v1/runner/get-runner/$(uname -m)/$(uname -s)/1.2.11; chmod +x $HOME/attini-runner; $HOME/attini-runner '" + sfnToken + "'; else attini-runner '" + sfnToken + "'; fi;")
-                                                                                        .environment(variables)
+                                                   .containerOverrides(containterOverridesBuilder
                                                                                         .build());
 
-        taskConfig.getRoleArn().ifPresent(builder::taskRoleArn);
+        taskConfig.cpu().ifPresent(cpu -> builder.cpu(String.valueOf(cpu)));
+        taskConfig.memory().ifPresent(memory -> builder.memory(String.valueOf(memory)));
+        taskConfig.roleArn().ifPresent(builder::taskRoleArn);
         return builder.build();
     }
 
@@ -202,5 +234,84 @@ public class EcsFacade {
                            .name(name)
                            .value(String.valueOf(value))
                            .build();
+    }
+
+    private String getStartupCommand(String sfnToken, String runnerVersion){
+        return """      
+                set -u
+                set -e
+                set -o pipefail
+                                
+                error(){
+                  echo "ERROR  $1" >&2
+                }
+                                
+                info(){
+                  echo "INFO   $1"
+                }
+                                
+                hint(){
+                  echo "HINT   $1"
+                }
+                                
+                OS=$(uname)
+                CPU=$(uname -m)
+                ATTINI_SFN_TOKEN=%s
+                                
+                if [[ "${OS}" != "Linux"  ]]
+                then
+                  error "Attini runner is only supported on Linux and you are running [ ${OS} ]"
+                  exit 1
+                fi
+                                
+                if [[ "${CPU}" != "x86_64" && "${CPU}" != "aarch64" && "${CPU}" != "arm64"  ]]
+                then
+                  error "Attini runner is only supported on CPU architectures x86_64 and aarch64 (arm64) and you are using [ ${CPU} ] "
+                  exit 1
+                fi
+                                
+                # Default configuration
+                CLI_DOMAIN=${ATTINI_DOCK_URL:-"https://docs.attini.io"}
+                                
+                if [[ $(aws --version > /dev/null 2>&1; echo $?) = "127"  ]]
+                then
+                  info "AWS CLI is not installed, trying to install it."
+                  hint "Pre-install AWS CLI version 2 on your container image to decrease startup time."
+                  if [[ $(unzip --version > /dev/null 2>&1; echo $?) = "127"  ]]
+                  then
+                    info "unzip is not installed and it is required to install the AWS CLI, will therefore try to install it."
+                    hint "We recommend that you preinstall AWS CLI version 2 on your image."
+                    yum -y install unzip || \\
+                    apt-get -y install unzip || \\
+                    dnf -y install unzip || \\
+                    (error "unzip could not be installed, so we can not install AWS CLI." && exit 1)
+                  fi
+                  curl "https://awscli.amazonaws.com/awscli-exe-linux-${CPU}.zip" -o "awscliv2.zip"
+                  unzip -q awscliv2.zip
+                  ./aws/install
+                                
+                elif aws --version | grep "aws-cli/1" > /dev/null
+                then
+                  error "AWS CLI version 1 is installed on this container. Attini runner requires AWS CLI version 2"
+                  error "Install AWS CLI version 2 on the image and try again."
+                  exit 1
+                elif  aws --version | grep "aws-cli/2" > /dev/null
+                then
+                  echo "AWS CLI is installed with the correct version"
+                else
+                  error "Unexpected error"
+                  exit 1
+                fi
+                                
+                if [[ $(attini-runner dry-run > /dev/null 2>&1; echo $?) = "127" ]]
+                then
+                  info "attini-runner not found so installing it."
+                  curl -sfL#o $HOME/attini-runner https://docs.attini.io/api/v1/runner/get-runner/${CPU}/${OS}/%s
+                  chmod +x $HOME/attini-runner
+                  exec $HOME/attini-runner $ATTINI_SFN_TOKEN
+                else
+                  exec attini-runner $ATTINI_SFN_TOKEN
+                fi
+                """.formatted(sfnToken, runnerVersion);
     }
 }
