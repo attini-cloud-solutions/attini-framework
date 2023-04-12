@@ -207,7 +207,7 @@ public class EcsFacade {
                                                                  .name(containerName)
                                                                  .command("/bin/bash",
                                                                           "-c",
-                                                                          getStartupCommand(sfnToken, "1.2.11"))
+                                                                          getStartupCommand(sfnToken, "1.3.0"))
                                                                  .environment(variables);
 
 
@@ -308,9 +308,9 @@ public class EcsFacade {
                   info "attini-runner not found so installing it."
                   curl -sfL#o $HOME/attini-runner https://docs.attini.io/api/v1/runner/get-runner/${CPU}/${OS}/%s
                   chmod +x $HOME/attini-runner
-                  $HOME/attini-runner $ATTINI_SFN_TOKEN
+                  exec $HOME/attini-runner $ATTINI_SFN_TOKEN
                 else
-                  attini-runner $ATTINI_SFN_TOKEN
+                  exec attini-runner $ATTINI_SFN_TOKEN
                 fi
                 """.formatted(sfnToken, runnerVersion);
     }

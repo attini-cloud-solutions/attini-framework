@@ -53,6 +53,8 @@ class RunnerHandlerTest {
         RunnerInput runnerInput = InputBuilder.aRunnerInput();
         RunnerData runnerData = RunnerDataTestBuilder.aRunnerData()
                                                      .taskId("a-task-id")
+                                                     .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
+                                                                                       .executionArn())
                                                      .build();
 
 
@@ -86,6 +88,8 @@ class RunnerHandlerTest {
         String taskId = "a-task-id";
         RunnerData runnerData = RunnerDataTestBuilder.aRunnerData()
                                                      .ec2(ec2)
+                                                     .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
+                                                                                       .executionArn())
                                                      .build();
 
 
@@ -127,6 +131,8 @@ class RunnerHandlerTest {
                                          .build())
                      .build();
         RunnerData runnerData = RunnerDataTestBuilder.aRunnerData()
+                                                     .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
+                                                                                       .executionArn())
                                                      .ec2(ec2)
                                                      .build();
 
@@ -165,6 +171,8 @@ class RunnerHandlerTest {
                                          .build())
                      .build();
         RunnerData runnerData = RunnerDataTestBuilder.aRunnerData()
+                                                     .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
+                                                                                       .executionArn())
                                                      .ec2(ec2)
                                                      .build();
 
@@ -208,6 +216,8 @@ class RunnerHandlerTest {
                      .build();
 
         RunnerData runnerData = RunnerDataTestBuilder.aRunnerData()
+                                                     .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
+                                                                                       .executionArn())
                                                      .ec2(ec2)
                                                      .build();
         when(stackDataDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
@@ -236,6 +246,8 @@ class RunnerHandlerTest {
     void shouldNotStartNewTaskBecauseItIsRunning() {
         RunnerInput runnerInput = InputBuilder.aRunnerInput();
         RunnerData runnerData = RunnerDataTestBuilder.aRunnerData()
+                                                     .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
+                                                                                       .executionArn())
                                                      .taskId("a-task-id")
                                                      .build();
 
@@ -264,6 +276,8 @@ class RunnerHandlerTest {
                                                                    .build();
         RunnerData runnerData = RunnerDataTestBuilder.aRunnerData()
                                                      .taskId("a-new-task-id")
+                                                     .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
+                                                                                       .executionArn())
                                                      .taskConfiguration(taskConfiguration)
                                                      .started(true)
                                                      .build();

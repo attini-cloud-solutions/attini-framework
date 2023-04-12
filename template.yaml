@@ -1973,6 +1973,9 @@ Resources:
                 - ecs-tasks.amazonaws.com
                 - ec2.amazonaws.com
             Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
       ManagedPolicyArns:
         !If
           - GiveAdminAccess

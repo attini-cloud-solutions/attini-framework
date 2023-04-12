@@ -52,7 +52,11 @@ public class RunnerHandler {
                                                                                           .stepName());
 
             RunnerData runnerData = stackDataDynamoFacade.getRunnerData(runnerInput.deployOriginData().getStackName(),
-                                                                        runnerInput.properties().runner());
+                                                                        runnerInput.properties().runner()).toBuilder()
+                                                         .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
+                                                                                           .executionArn())
+                                                         .build();
+
             sqsClient.sendMessage(SendMessageRequest.builder()
                                                     .queueUrl(runnerData.getTaskConfiguration().queueUrl())
                                                     .messageGroupId(messageId)
@@ -60,6 +64,8 @@ public class RunnerHandler {
                                                     .messageBody(createInput(runnerInput,
                                                                              runnerData.currentConfigurationHash()))
                                                     .build());
+
+            stackDataDynamoFacade.saveRunnerData(runnerData);
 
             RunnerData runnerDataWithEc2Id = startEc2IfConfigured(runnerData);
 
@@ -89,11 +95,9 @@ public class RunnerHandler {
                                                                       true)
                                                        .getStartedByExecutionArn();
 
-                          if (runnerInput.deploymentPlanExecutionMetadata()
-                                         .executionArn()
-                                         .equals(startedByExecutionArn.orElse(null))) {
+                          if (taskIdHasChanged(runnerData, runnerInput)) {
                               logger.info(
-                                      "The current running task was started by the current execution id, this indicated that it was started by a parallel branch and no task should be started.");
+                                      "Task id has changed during execution. This indicated another parallel branch has started the task.");
                               return;
                           }
 
@@ -133,6 +137,16 @@ public class RunnerHandler {
         }
 
 
+    }
+
+    private boolean taskIdHasChanged(RunnerData runnerData, RunnerInput runnerInput) {
+        Optional<String> currentTaskId = stackDataDynamoFacade.getRunnerData(runnerInput.deployOriginData()
+                                                                                        .getStackName(),
+                                                                             runnerInput.properties()
+                                                                                        .runner(), true)
+                                                              .getTaskId();
+
+        return !runnerData.getTaskId().equals(currentTaskId);
     }
 
     private boolean configurationHasChanged(RunnerData currentRunnerData) {
@@ -254,8 +268,6 @@ public class RunnerHandler {
                                              sfnToken);
 
         RunnerData updatedRunnerData = runnerData.toBuilder()
-                                                 .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
-                                                                                   .executionArn())
                                                  .taskId(taskArn)
                                                  .started(false)
                                                  .build();
