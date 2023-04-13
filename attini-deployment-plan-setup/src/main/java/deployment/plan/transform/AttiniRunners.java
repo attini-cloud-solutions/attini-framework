@@ -180,7 +180,7 @@ public class AttiniRunners {
                                                                                   ec2Configuration
                                                                                           .path("InstanceType")))
                                                                           .build());
-                                        if (jsonNode.path("Image").isMissingNode()) {
+                                        if (jsonNode.path("Image").isMissingNode() && jsonNode.path("TaskDefinitionArn").isMissingNode()) {
                                             String taskDefinitionName = entry.getKey() + "TaskDefinition";
                                             taskDefinitions.put(taskDefinitionName,
                                                                 Resources.ec2taskDefinition(CfnString.create(

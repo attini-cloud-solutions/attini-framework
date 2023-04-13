@@ -171,6 +171,7 @@ public class Ec2Facade {
                                    .status()
                                    .equals(SummaryStatus.OK);
         } catch (Ec2Exception e) {
+            // if the instance was terminated more then a few hours ago then an Ec2Exception will be thrown.
             logger.info("Could not get instance status of latest instance. Reason: " + e.getMessage());
             return false;
         }

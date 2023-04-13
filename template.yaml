@@ -1971,11 +1971,15 @@ Resources:
             Principal:
               Service:
                 - ecs-tasks.amazonaws.com
-                - ec2.amazonaws.com
             Action: sts:AssumeRole
             Condition:
               StringEquals:
                 aws:SourceAccount: !Ref AWS::AccountId
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action: sts:AssumeRole
       ManagedPolicyArns:
         !If
           - GiveAdminAccess
