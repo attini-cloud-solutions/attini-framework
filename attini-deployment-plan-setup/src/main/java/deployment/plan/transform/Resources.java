@@ -98,7 +98,11 @@ public class Resources {
                                                               "Container",
                                                               "Image",
                                                               image,
-                                                              "Privileged", true,
+                                                              "Privileged",
+                                                              false,
+                                                              "MountPoints",
+                                                              List.of(Map.of("SourceVolume", "dockersock",
+                                                                             "ContainerPath", "/var/run/docker.sock")),
                                                               "LogConfiguration",
                                                               logConfiguration));
 
@@ -110,6 +114,10 @@ public class Resources {
                                            "TaskRoleArn", roleArn,
                                            "Memory", 3072,
                                            "NetworkMode", "bridge",
-                                           "RequiresCompatibilities", List.of("EC2")));
+                                           "RequiresCompatibilities", List.of("EC2"),
+                                           "Volumes", List.of(Map.of("Name",
+                                                                     "dockersock",
+                                                                     "Host",
+                                                                     Map.of("SourcePath", "/var/run/docker.sock")))));
     }
 }

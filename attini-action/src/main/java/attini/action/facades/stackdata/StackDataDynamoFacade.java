@@ -87,12 +87,23 @@ public class StackDataDynamoFacade implements StackDataFacade {
         runnerData.getTaskId().ifPresent(s -> map.put("taskId", toStringUpdateAttribute(s)));
         map.put("taskDefinitionArn", toStringUpdateAttribute(runnerData.getTaskDefinitionArn()));
         map.put("started", AttributeValueUpdate.builder().value(AttributeValue.builder().bool(false).build()).build());
-        map.put("taskConfigHashCode", toStringUpdateAttribute(String.valueOf(runnerData.getTaskConfiguration().hashCode())));
+        map.put("taskConfigHashCode",
+                toStringUpdateAttribute(String.valueOf(runnerData.getTaskConfiguration().hashCode())));
         map.put("cluster", toStringUpdateAttribute(runnerData.getTaskConfiguration().cluster()));
+        map.put("shutdownHookDisabled",
+                AttributeValueUpdate.builder()
+                                    .value(AttributeValue.builder().bool(runnerData.shutdownHookDisabled()).build())
+                                    .build());
 
-        runnerData.getStartedByExecutionArn().ifPresent(sfnExecutionArn -> map.put("startedByExecutionArn", toStringUpdateAttribute(sfnExecutionArn.asString())));
-        runnerData.getEc2().ifPresent(ec2 -> map.put("ec2ConfigHashCode", toStringUpdateAttribute(String.valueOf(ec2.getConfigHashCode()))));
-        runnerData.getEc2().flatMap(Ec2::getLatestEc2InstanceId).ifPresent(s -> map.put("latestEc2InstanceId", toStringUpdateAttribute(s)));
+        runnerData.getStartedByExecutionArn()
+                  .ifPresent(sfnExecutionArn -> map.put("startedByExecutionArn",
+                                                        toStringUpdateAttribute(sfnExecutionArn.asString())));
+        runnerData.getEc2()
+                  .ifPresent(ec2 -> map.put("ec2ConfigHashCode",
+                                            toStringUpdateAttribute(String.valueOf(ec2.getConfigHashCode()))));
+        runnerData.getEc2()
+                  .flatMap(Ec2::getLatestEc2InstanceId)
+                  .ifPresent(s -> map.put("latestEc2InstanceId", toStringUpdateAttribute(s)));
         runnerData.getContainer().ifPresent(s -> map.put("container", toStringUpdateAttribute(s)));
 
         dynamoDbClient.updateItem(UpdateItemRequest.builder()
@@ -189,7 +200,7 @@ public class StackDataDynamoFacade implements StackDataFacade {
                                                                                         stackConfiguration))
                                                                                 .build()).item();
 
-        if (item.containsKey("sfnExecutionArn")){
+        if (item.containsKey("sfnExecutionArn")) {
             return Optional.of(SfnExecutionArn.create(item.get("sfnExecutionArn").s()));
         }
         return Optional.empty();

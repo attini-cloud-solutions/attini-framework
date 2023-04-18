@@ -182,18 +182,19 @@ public class AttiniRunners {
                                                                           .build());
                                         if (jsonNode.path("Image").isMissingNode() && jsonNode.path("TaskDefinitionArn").isMissingNode()) {
                                             String taskDefinitionName = entry.getKey() + "TaskDefinition";
+                                            String logGroupName = entry.getKey() + "LogGroup";
                                             taskDefinitions.put(taskDefinitionName,
                                                                 Resources.ec2taskDefinition(CfnString.create(
                                                                                                     defaultRunnerImage),
                                                                                             createRoleArnRef(
                                                                                                     objectMapper,
-                                                                                                    jsonNode.path(
-                                                                                                            "RoleArn")),
-                                                                                            entry.getKey() + "LogGroup"));
+                                                                                                    jsonNode.path("RoleArn")),
+                                                                                            logGroupName));
                                             runnerBuilder.taskDefinitionArn(CfnString.create(objectMapper.valueToTree(
                                                     Map.of(
                                                             "Ref",
                                                             taskDefinitionName))));
+                                            logGroups.put(logGroupName, Resources.logGroup());
                                         }
 
                                     }
