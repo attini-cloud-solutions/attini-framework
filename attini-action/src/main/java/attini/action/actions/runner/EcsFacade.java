@@ -33,6 +33,8 @@ public class EcsFacade {
 
     private static final Logger logger = Logger.getLogger(EcsFacade.class);
 
+    private static final String RUNNER_VERSION = "1.3.1";
+
     private final EcsClient ecsClient;
     private final EnvironmentVariables environmentVariables;
 
@@ -74,7 +76,7 @@ public class EcsFacade {
 
     }
 
-    public void waitUntilStopped(String taskId, String cluster){
+    public void waitUntilStopped(String taskId, String cluster) {
         ecsClient.waiter().waitUntilTasksStopped(DescribeTasksRequest.builder().cluster(cluster).tasks(taskId).build());
     }
 
@@ -229,8 +231,7 @@ public class EcsFacade {
                                                                                 .name(containerName)
                                                                                 .command("/bin/bash",
                                                                                          "-c",
-                                                                                         getStartupCommand(sfnToken,
-                                                                                                           "1.3.0"))
+                                                                                         getStartupCommand(sfnToken))
                                                                                 .environment(variables);
 
 
@@ -259,7 +260,7 @@ public class EcsFacade {
                            .build();
     }
 
-    private String getStartupCommand(String sfnToken, String runnerVersion) {
+    private String getStartupCommand(String sfnToken) {
         return """      
                 set -u
                 set -e
@@ -335,6 +336,6 @@ public class EcsFacade {
                 else
                   exec attini-runner $ATTINI_SFN_TOKEN
                 fi
-                """.formatted(sfnToken, runnerVersion);
+                """.formatted(sfnToken, RUNNER_VERSION);
     }
 }
