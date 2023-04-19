@@ -165,8 +165,8 @@ public class AttiniRunners {
                                         runnerBuilder
                                                 .ec2Configuration(Ec2Configuration
                                                                           .builder()
-                                                                          .imageId(CfnString.create(ec2Configuration
-                                                                                                            .path("ImageId")))
+                                                                          .ami(CfnString.create(ec2Configuration
+                                                                                                            .path("Ami")))
                                                                           .ecsClientLogGroup(CfnString.create(
                                                                                   objectMapper.valueToTree(
                                                                                           Map.of("Ref",

@@ -52,8 +52,12 @@ public class Ec2Facade {
                                                                  "/aws/service/ecs/optimized-ami/amazon-linux-2/gpu/recommended",
                                                                  "AmazonLinux2_inf",
                                                                  "/aws/service/ecs/optimized-ami/amazon-linux-2/inf/recommended",
-                                                                 "AmazonLinux2022",
-                                                                 "/aws/service/ecs/optimized-ami/amazon-linux-2022/recommended");
+                                                                 "AmazonLinux2023",
+                                                                 "/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended",
+                                                                 "AmazonLinux2023_arm64",
+                                                                 "/aws/service/ecs/optimized-ami/amazon-linux-2023/arm64/recommended",
+                                                                 "AmazonLinux2023_inf",
+                                                                 "/aws/service/ecs/optimized-ami/amazon-linux-2023/inf/recommended");
 
     public Ec2Facade(Ec2Client ec2Client,
                      EnvironmentVariables environmentVariables,
@@ -68,7 +72,7 @@ public class Ec2Facade {
 
         logger.info("Starting new ec2 instance");
 
-        String imageId = getImageId(ec2.getEc2Config().imageId().orElse("AmazonLinux2"));
+        String imageId = getImageId(ec2.getEc2Config().ami().orElse("AmazonLinux2"));
         String deviceName = ec2Client.describeImages(DescribeImagesRequest.builder().imageIds(imageId).build())
                                      .images()
                                      .stream().findAny()
@@ -139,12 +143,18 @@ public class Ec2Facade {
         return ec2Instance.instances().get(0).instanceId();
     }
 
-    private String getImageId(String imageId) {
-        String ssmKey = imageIdMap.get(imageId);
+    private String getImageId(String ami) {
+        String ssmKey = imageIdMap.get(ami);
 
-        if (ssmKey == null) {
-            throw new IllegalArgumentException("Invalid image id, allowed values are: " + imageIdMap.keySet() + ". Current value: " + imageId);
+        if (ssmKey == null && !ami.startsWith("ami-")) {
+            throw new IllegalArgumentException("Invalid AMI, allowed short hand values are: " + imageIdMap.keySet() + ". You can also" +
+                                               " specify a valid imageId, starting with \"ami-\". Current value: " + ami);
         }
+
+        if (ssmKey == null){
+            return ami;
+        }
+
         String paramValue = ssmClient.getParameter(GetParameterRequest.builder().name(ssmKey).build())
                                      .parameter()
                                      .value();
