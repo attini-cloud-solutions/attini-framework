@@ -163,9 +163,9 @@ public class DeployStatesFacade {
                                                                                                           .asString())
                                                                                        .build());
 
-                                   if (ec2Configuration.getImageId() != null) {
-                                       ec2CondigMap.put("imageId",
-                                                        AttributeValue.builder().s(ec2Configuration.getImageId().asString()).build());
+                                   if (ec2Configuration.getAmi() != null) {
+                                       ec2CondigMap.put("ami",
+                                                        AttributeValue.builder().s(ec2Configuration.getAmi().asString()).build());
                                    }
                                    map.put("ec2Configuration",
                                            AttributeValueUpdate.builder()

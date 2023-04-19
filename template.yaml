@@ -1941,7 +1941,7 @@ Resources:
       InstanceProfileName: !Sub attini-runner-default-instance-profile-${AWS::Region}
       Path: /attini/
       Roles:
-        - !Ref AttiniDefaultRunnerRole
+        - !Ref AttiniDefaultEC2RunnerRole
 
   AttiniDefaultRunnerLogGroup:
     Type: AWS::Logs::LogGroup
@@ -1971,7 +1971,6 @@ Resources:
             Principal:
               Service:
                 - ecs-tasks.amazonaws.com
-                - ec2.amazonaws.com
             Action: sts:AssumeRole
             Condition:
               StringEquals:
@@ -1995,6 +1994,26 @@ Resources:
                     Resource:
                       - !Sub arn:aws:s3:::attini-artifact-store-${AWS::Region}-${AWS::AccountId}/*/.sam-source/*
 
+  AttiniDefaultEC2RunnerRole:
+    Type: AWS::IAM::Role
+    DependsOn:
+      - AttiniAutoUpdatePolicy
+    Properties:
+      RoleName: !Sub attini-default-ec2-runner-role-${AWS::Region}
+      Path: /attini/
+      Tags:
+        - Key: Attini
+          Value: "-"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
 
 Outputs:
   AttiniSetupVersion:

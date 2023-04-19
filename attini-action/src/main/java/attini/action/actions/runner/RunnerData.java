@@ -40,6 +40,8 @@ public class RunnerData {
 
     private SfnExecutionArn startedByExecutionArn;
 
+    private boolean shutdownHookDisabled;
+
     public DistributionId getDistributionId() {
         return distributionId;
     }
@@ -107,5 +109,9 @@ public class RunnerData {
 
     public Optional<SfnExecutionArn> getStartedByExecutionArn() {
         return Optional.ofNullable(startedByExecutionArn);
+    }
+
+    public boolean shutdownHookDisabled() {
+        return shutdownHookDisabled;
     }
 }

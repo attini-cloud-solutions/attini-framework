@@ -15,6 +15,7 @@ import software.amazon.awssdk.services.ecs.model.ContainerDefinition;
 import software.amazon.awssdk.services.ecs.model.ContainerOverride;
 import software.amazon.awssdk.services.ecs.model.DescribeTaskDefinitionRequest;
 import software.amazon.awssdk.services.ecs.model.DescribeTasksRequest;
+import software.amazon.awssdk.services.ecs.model.EcsException;
 import software.amazon.awssdk.services.ecs.model.InvalidParameterException;
 import software.amazon.awssdk.services.ecs.model.KeyValuePair;
 import software.amazon.awssdk.services.ecs.model.LaunchType;
@@ -31,6 +32,8 @@ import software.amazon.awssdk.services.ecs.model.TaskOverride;
 public class EcsFacade {
 
     private static final Logger logger = Logger.getLogger(EcsFacade.class);
+
+    private static final String RUNNER_VERSION = "1.3.1";
 
     private final EcsClient ecsClient;
     private final EnvironmentVariables environmentVariables;
@@ -73,57 +76,77 @@ public class EcsFacade {
 
     }
 
+    public void waitUntilStopped(String taskId, String cluster) {
+        ecsClient.waiter().waitUntilTasksStopped(DescribeTasksRequest.builder().cluster(cluster).tasks(taskId).build());
+    }
+
     public String startTask(RunnerData runnerData,
                             String sfnToken) {
 
 
-        TaskConfiguration runnerConfig = runnerData.getTaskConfiguration();
+        try {
+            TaskConfiguration runnerConfig = runnerData.getTaskConfiguration();
 
-        boolean isEc2Task = runnerData.getEc2().isPresent();
-        NetworkConfiguration networkConfiguration =
-                NetworkConfiguration
-                        .builder()
-                        .awsvpcConfiguration(
-                                AwsVpcConfiguration.builder()
-                                                   .subnets(runnerConfig.subnets())
-                                                   .securityGroups(runnerConfig.securityGroups())
-                                                   .assignPublicIp(runnerConfig.assignPublicIp())
-                                                   .build())
-                        .build();
+            NetworkConfiguration networkConfiguration =
+                    NetworkConfiguration
+                            .builder()
+                            .awsvpcConfiguration(
+                                    AwsVpcConfiguration.builder()
+                                                       .subnets(runnerConfig.subnets())
+                                                       .securityGroups(runnerConfig.securityGroups())
+                                                       .assignPublicIp(runnerConfig.assignPublicIp())
+                                                       .build())
+                            .build();
 
+            RunTaskResponse runTaskResponse =
+                    ecsClient.runTask(createGetTaskRequest(runnerData,
+                                                           sfnToken,
+                                                           runnerConfig,
+                                                           networkConfiguration));
 
+            if (!runTaskResponse.failures().isEmpty()) {
+                logger.error("Ecs tasks failed to start");
+                runTaskResponse.failures().forEach(logger::error);
+            }
+
+            return runTaskResponse.tasks()
+                                  .stream()
+                                  .findAny()
+                                  .map(Task::taskArn)
+                                  .orElseThrow(() -> new TaskStartFailedSyncException(
+                                          "Ecs task failed to start. Reason: " + runTaskResponse.failures()));
+        } catch (EcsException e) {
+            throw new TaskStartFailedSyncException(e.getMessage(), e);
+        }
+    }
+
+    private RunTaskRequest createGetTaskRequest(RunnerData runnerData,
+                                                String sfnToken,
+                                                TaskConfiguration runnerConfig,
+                                                NetworkConfiguration networkConfiguration) {
         RunTaskRequest.Builder builder = RunTaskRequest.builder()
-                                                       .enableECSManagedTags(isEc2Task)
-
-                                                       .launchType(isEc2Task ? LaunchType.EC2 : LaunchType.FARGATE)
                                                        .propagateTags(PropagateTags.TASK_DEFINITION)
                                                        .taskDefinition(runnerConfig.taskDefinitionArn())
                                                        .cluster(runnerConfig.cluster())
                                                        .overrides(getOverrides(runnerData,
                                                                                sfnToken));
 
-        if (isEc2Task) {
-            builder.placementConstraints(PlacementConstraint.builder()
-                                                            .type(PlacementConstraintType.MEMBER_OF)
-                                                            .expression("attribute:runnerResourceName == " + runnerData.getAttiniRunnerResourceName())
-                                                            .build());
+
+        if (runnerData.getEc2().isPresent()) {
+            return builder.placementConstraints(PlacementConstraint.builder()
+                                                                   .type(PlacementConstraintType.MEMBER_OF)
+                                                                   .expression("attribute:runnerResourceName == " + runnerData.getAttiniRunnerResourceName())
+                                                                   .build())
+                          .launchType(LaunchType.EC2)
+                          .enableECSManagedTags(true)
+                          .build();
         }
 
-        if (!isEc2Task) {
-            builder.networkConfiguration(networkConfiguration);
-        }
-        RunTaskResponse runTaskResponse = ecsClient.runTask(builder.build());
-
-
-        if (!runTaskResponse.failures().isEmpty()){
-            logger.error("Ecs tasks failed to start");
-            runTaskResponse.failures().forEach(logger::error);
-        }
-
-        if (runTaskResponse.tasks().isEmpty()){
-            throw new TaskStartFailedSyncException("Ecs task failed to start. Reason: " + runTaskResponse.failures());
-        }
-        return runTaskResponse.tasks().get(0).taskArn();
+        //  Network configuration is set on the ECS task if the launch type is fargate.
+        //  Otherwise, it is configured on the EC2 instance.
+        return builder.networkConfiguration(networkConfiguration)
+                      .launchType(LaunchType.FARGATE)
+                      .build();
     }
 
     private TaskOverride getOverrides(RunnerData runnerData,
@@ -131,21 +154,22 @@ public class EcsFacade {
 
         TaskConfiguration taskConfig = runnerData.getTaskConfiguration();
 
-        String containerName = taskConfig.container().orElseGet(() -> {
-            List<ContainerDefinition> containerDefinitions = ecsClient.describeTaskDefinition(
-                                                                              DescribeTaskDefinitionRequest.builder()
-                                                                                                           .taskDefinition(
-                                                                                                                   taskConfig.taskDefinitionArn())
-                                                                                                           .build())
-                                                                      .taskDefinition()
-                                                                      .containerDefinitions();
+        String containerName = taskConfig.container()
+                                         .orElseGet(() -> {
+                                             List<ContainerDefinition> containerDefinitions = ecsClient.describeTaskDefinition(
+                                                                                                               DescribeTaskDefinitionRequest.builder()
+                                                                                                                                            .taskDefinition(
+                                                                                                                                                    taskConfig.taskDefinitionArn())
+                                                                                                                                            .build())
+                                                                                                       .taskDefinition()
+                                                                                                       .containerDefinitions();
 
-            if (containerDefinitions.size() != 1) {
-                throw new IllegalArgumentException(
-                        "Could not resolve container name. Container name is mandatory in the runner configuration if the number of containers in the task definition does not equal 1");
-            }
-            return containerDefinitions.get(0).name();
-        });
+                                             if (containerDefinitions.size() != 1) {
+                                                 throw new IllegalArgumentException(
+                                                         "Could not resolve container name. Container name is mandatory in the runner configuration if the number of containers in the task definition does not equal 1");
+                                             }
+                                             return containerDefinitions.get(0).name();
+                                         });
 
 
         Set<KeyValuePair> variables =
@@ -204,16 +228,16 @@ public class EcsFacade {
 
 
         ContainerOverride.Builder containterOverridesBuilder = ContainerOverride.builder()
-                                                                 .name(containerName)
-                                                                 .command("/bin/bash",
-                                                                          "-c",
-                                                                          getStartupCommand(sfnToken, "1.3.0"))
-                                                                 .environment(variables);
+                                                                                .name(containerName)
+                                                                                .command("/bin/bash",
+                                                                                         "-c",
+                                                                                         getStartupCommand(sfnToken))
+                                                                                .environment(variables);
 
 
         TaskOverride.Builder builder = TaskOverride.builder()
                                                    .containerOverrides(containterOverridesBuilder
-                                                                                        .build());
+                                                                               .build());
 
         taskConfig.cpu().ifPresent(cpu -> builder.cpu(String.valueOf(cpu)));
         taskConfig.memory().ifPresent(memory -> builder.memory(String.valueOf(memory)));
@@ -236,7 +260,7 @@ public class EcsFacade {
                            .build();
     }
 
-    private String getStartupCommand(String sfnToken, String runnerVersion){
+    private String getStartupCommand(String sfnToken) {
         return """      
                 set -u
                 set -e
@@ -312,6 +336,6 @@ public class EcsFacade {
                 else
                   exec attini-runner $ATTINI_SFN_TOKEN
                 fi
-                """.formatted(sfnToken, runnerVersion);
+                """.formatted(sfnToken, RUNNER_VERSION);
     }
 }

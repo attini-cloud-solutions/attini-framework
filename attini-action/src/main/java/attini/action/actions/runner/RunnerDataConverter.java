@@ -52,7 +52,7 @@ public class RunnerDataConverter {
                                              .instanceProfile(
                                                      toNoneNullString(ec2Configuration.get("instanceProfile"),
                                                                       "instanceProfile", runnerName))
-                                             .imageId(toNullableString(ec2Configuration.get("imageId")))
+                                             .ami(toNullableString(ec2Configuration.get("ami")))
                                              .build())
                          .build();
             builder.ec2(ec2);

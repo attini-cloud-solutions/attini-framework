@@ -12,12 +12,12 @@ public final class Ec2Config {
     private final String instanceType;
     private final String ecsClientLogGroup;
     private final String instanceProfile;
-    private final String imageId;
+    private final String ami;
 
 
 
-    public Optional<String> imageId() {
-        return Optional.ofNullable(imageId);
+    public Optional<String> ami() {
+        return Optional.ofNullable(ami);
     }
 
     public String instanceType() {
@@ -41,12 +41,12 @@ public final class Ec2Config {
         return Objects.equals(this.instanceType, that.instanceType) &&
                Objects.equals(this.ecsClientLogGroup, that.ecsClientLogGroup) &&
                Objects.equals(this.instanceProfile, that.instanceProfile) &&
-               Objects.equals(this.imageId, that.imageId);
+               Objects.equals(this.ami, that.ami);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(instanceType, ecsClientLogGroup, instanceProfile, imageId);
+        return Objects.hash(instanceType, ecsClientLogGroup, instanceProfile, ami);
     }
 
     @Override
@@ -55,7 +55,7 @@ public final class Ec2Config {
                "instanceType=" + instanceType + ", " +
                "ecsClientLogGroup=" + ecsClientLogGroup + ", " +
                "instanceProfile=" + instanceProfile + ", " +
-               "imageId=" + imageId + ']';
+               "ami=" + ami + ']';
     }
 
 }
