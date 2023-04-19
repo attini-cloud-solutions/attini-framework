@@ -111,14 +111,17 @@ public class RunnerHandler {
 
                           if (taskStatus.isRunningOrStarting() && configurationHasChanged(runnerData)) {
                               logger.info("The task configuration has changed, will stop old task.");
-                              stackDataDynamoFacade.saveRunnerData(runnerData.toBuilder()
-                                                                             .shutdownHookDisabled(true)
-                                                                             .build());
-                              ecsFacade.stopTask(taskId, runnerData.getCluster());
-                              runnerData.getEc2().ifPresent(ec2 -> {
-                                  logger.info("Waiting for task to stop before starting new task to ensure EC2 instance is not terminated by the tasks shutdown hook");
+
+                              runnerData.getEc2().ifPresentOrElse(ec2 -> {
+                                  stackDataDynamoFacade.saveRunnerData(runnerData.toBuilder()
+                                                                                 .shutdownHookDisabled(true)
+                                                                                 .build());
+                                  ecsFacade.stopTask(taskId, runnerData.getCluster());
+                                  logger.info(
+                                          "Waiting for task to stop before starting new task to ensure EC2 instance is not terminated by the tasks shutdown hook");
                                   ecsFacade.waitUntilStopped(taskId, runnerData.getCluster());
-                              });
+                              }, () -> ecsFacade.stopTask(taskId, runnerData.getCluster()));
+
                               startTask(runnerData, sfnToken, runnerInput);
                           } else if (taskStatus.isStoppingOrStopped()) {
                               logger.info("Ecs task is stopped, will start new task.");
