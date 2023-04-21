@@ -338,7 +338,7 @@ Mappings:
       AttiniStepGuardFunction: 40
   Variables:
     Runner:
-      Image: public.ecr.aws/attini/default-runner:attini-default-runner-1.0.7
+      Image: public.ecr.aws/attini/default-runner:attini-default-runner-1.1.0
 
 
 Resources:
