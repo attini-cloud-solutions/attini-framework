@@ -116,6 +116,22 @@ public class Ec2Facade {
                                                                                   .tags(Tag.builder()
                                                                                            .key("AttiniResourceType")
                                                                                            .value("RunnerInstance")
+                                                                                           .build(),
+                                                                                        Tag.builder()
+                                                                                           .key("Name")
+                                                                                           .value(runnerData.getRunnerName())
+                                                                                           .build(),
+                                                                                        Tag.builder()
+                                                                                           .key("AttiniDistributionName")
+                                                                                           .value(runnerData.getDistributionName().asString())
+                                                                                           .build(),
+                                                                                        Tag.builder()
+                                                                                           .key("AttiniEnvironment")
+                                                                                           .value(runnerData.getEnvironment().asString())
+                                                                                           .build(),
+                                                                                        Tag.builder()
+                                                                                           .key("EcsCluster")
+                                                                                           .value(runnerData.getTaskConfiguration().cluster())
                                                                                            .build())
                                                                                   .build())
                                                           .iamInstanceProfile(

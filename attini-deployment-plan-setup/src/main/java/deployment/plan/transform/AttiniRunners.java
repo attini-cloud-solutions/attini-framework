@@ -1,6 +1,5 @@
 package deployment.plan.transform;
 
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -11,7 +10,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -31,6 +29,97 @@ public class AttiniRunners {
 
     private final Map<String, Map<String, Object>> logGroups = new HashMap<>();
 
+    private final String region;
+    private final String accountId;
+
+    private final ObjectMapper objectMapper;
+    public AttiniRunners(Map<String, Map<String, Object>> resources,
+                         Ec2Client ec2Client,
+                         String region,
+                         String accountId,
+                         String defaultRunnerImage) {
+        this.region = region;
+        this.accountId = accountId;
+        this.objectMapper = new ObjectMapper();
+
+        this.runners = resources.entrySet()
+                                .stream()
+                                .filter(entry -> "Attini::Deploy::Runner".equals(entry.getValue().get("Type")))
+                                .map(entry -> {
+                                    String resourceName = entry.getKey();
+                                    JsonNode properties = objectMapper.valueToTree(entry.getValue()).path("Properties");
+                                    checkImageAndTaskDefinition(resourceName, properties);
+
+                                    Runner.RunnerBuilder runnerBuilder = initBuilder(resourceName, properties);
+
+                                    if (properties.path("AwsVpcConfiguration").isMissingNode()) {
+                                        securityGroups.put(resourceName, Resources.securityGroups(resourceName));
+                                        runnerBuilder.subnets(CfnString.create(String.join(",", getSubnets(ec2Client))));
+                                        runnerBuilder.securityGroups(createIntrinsicFunction("Fn::GetAtt",
+                                                                                             getSecurityGroupName(
+                                                                                                     resourceName) + ".GroupId"));
+
+                                        runnerBuilder.assignPublicIp(CfnString.create(objectMapper.valueToTree("ENABLED")));
+                                    } else {
+                                        JsonNode awsVpcConfiguration = properties.path("AwsVpcConfiguration");
+                                        validateVpcConfiguration(entry, awsVpcConfiguration);
+                                        runnerBuilder.subnets(CfnString.create(awsVpcConfiguration.path("Subnets")))
+                                                     .securityGroups(CfnString.create(awsVpcConfiguration.path(
+                                                             "SecurityGroups")))
+                                                     .assignPublicIp(CfnString.create(awsVpcConfiguration.path(
+                                                             "AssignPublicIp")));
+
+                                    }
+
+                                    if (!properties.path("Image").isMissingNode()) {
+                                        String taskDefinitionName = resourceName + "TaskDefinition";
+                                        String logGroupName = resourceName + "LogGroup";
+                                        runnerBuilder.taskDefinitionArn(createIntrinsicFunction("Ref",
+                                                                                                taskDefinitionName));
+                                        CfnString roleArn = createRoleArnRef(properties.path("RoleArn"));
+                                        if (properties.path("Ec2Configuration").isMissingNode()) {
+                                            taskDefinitions.put(taskDefinitionName,
+                                                                Resources.taskDefinition(CfnString.create(properties.get(
+                                                                        "Image")), roleArn, logGroupName));
+                                        } else {
+                                            taskDefinitions.put(taskDefinitionName,
+                                                                Resources.ec2taskDefinition(CfnString.create(properties.get(
+                                                                        "Image")), roleArn, logGroupName));
+                                        }
+                                        logGroups.put(logGroupName, Resources.logGroup());
+                                    }
+
+
+                                    if (!properties.path("Ec2Configuration").isMissingNode()) {
+                                        String ecsClientLogGroupName = resourceName + "EcsClientLogGroup";
+                                        taskDefinitions.put(ecsClientLogGroupName, Resources.logGroup());
+                                        runnerBuilder
+                                                .ec2Configuration(createEc2Configuration(ecsClientLogGroupName,
+                                                                                         properties.path(
+                                                                                                 "Ec2Configuration")));
+
+                                        if (properties.path("Image").isMissingNode() && properties.path(
+                                                "TaskDefinitionArn").isMissingNode()) {
+                                            String taskDefinitionName = resourceName + "TaskDefinition";
+                                            String logGroupName = resourceName + "LogGroup";
+                                            taskDefinitions.put(taskDefinitionName,
+                                                                Resources.ec2taskDefinition(CfnString.create(
+                                                                                                    defaultRunnerImage),
+                                                                                            createRoleArnRef(
+                                                                                                    properties.path(
+                                                                                                            "RoleArn")),
+                                                                                            logGroupName));
+                                            runnerBuilder.taskDefinitionArn(createIntrinsicFunction("Ref",
+                                                                                                    taskDefinitionName));
+                                            logGroups.put(logGroupName, Resources.logGroup());
+                                        }
+
+                                    }
+                                    return runnerBuilder.build();
+                                })
+                                .collect(Collectors.toMap(Runner::getName, Function.identity()));
+    }
+
     public Map<String, Map<String, Object>> getSecurityGroups() {
         return securityGroups.entrySet()
                              .stream()
@@ -46,164 +135,103 @@ public class AttiniRunners {
         return logGroups;
     }
 
-    public AttiniRunners(Map<String, Map<String, Object>> resources,
-                         Ec2Client ec2Client,
-                         String region,
-                         String accountId,
-                         String defaultRunnerImage) {
-        ObjectMapper objectMapper = new ObjectMapper();
 
-
-        this.runners = resources.entrySet()
-                                .stream()
-                                .filter(entry -> "Attini::Deploy::Runner".equals(entry.getValue().get("Type")))
-                                .map(entry -> {
-                                    JsonNode jsonNode = objectMapper.valueToTree(entry.getValue()).path("Properties");
-                                    JsonNode installationCommandsNode = jsonNode.path("Startup").path("Commands");
-                                    if (!installationCommandsNode.isMissingNode() && !installationCommandsNode.isArray()) {
-                                        throw new IllegalArgumentException(
-                                                "Illegal format for installations commands for runner" + entry.getKey() + ". Installation commands should be a list");
-                                    }
-                                    List<CfnString> commands = StreamSupport.stream(installationCommandsNode.spliterator(),
-                                                                                    false)
-                                                                            .map(CfnString::create)
-                                                                            .collect(Collectors.toList());
-                                    CfnString taskDefinitionArn = jsonNode.path("TaskDefinitionArn")
-                                                                          .isMissingNode() ? CfnString.create(Resources.getDefaultTaskDefinitionArn(
-                                            region,
-                                            accountId)) : CfnString.create(jsonNode.path("TaskDefinitionArn"));
-                                    Runner.RunnerBuilder runnerBuilder =
-                                            Runner.builder()
-                                                  .name(entry.getKey())
-                                                  .installationCommands(commands)
-                                                  .installationCommandsTimeout(CfnString.create(
-                                                          jsonNode.path("Startup")
-                                                                  .path("CommandsTimeout")))
-                                                  .containerName(CfnString.create(jsonNode.path(
-                                                          "ContainerName")))
-                                                  .cluster(CfnString.create(jsonNode.path(
-                                                          "EcsCluster")))
-                                                  .roleArn(CfnString.create(jsonNode.path(
-                                                          "RoleArn")))
-                                                  .taskDefinitionArn(taskDefinitionArn)
-                                                  .idleTimeToLive(CfnString.create(jsonNode.path("RunnerConfiguration")
-                                                                                           .path("IdleTimeToLive")))
-                                                  .jobTimeout(CfnString.create(jsonNode.path("RunnerConfiguration")
-                                                                                       .path("JobTimeout")))
-                                                  .logLevel(CfnString.create(jsonNode.path("RunnerConfiguration")
-                                                                                     .path("LogLevel")))
-                                                  .maxConcurrentJobs(CfnString.create(jsonNode.path(
-                                                                                                      "RunnerConfiguration")
-                                                                                              .path("MaxConcurrentJobs")))
-                                                  .queueUrl(CfnString.create(createJsonNode(
-                                                          "{\"Fn::GetAtt\" : \"" + getQueueName(
-                                                                  entry.getKey()) + ".QueueUrl\"}",
-                                                          objectMapper)))
-                                                  .memory(CfnString.create(jsonNode.path(
-                                                          "Memory")))
-                                                  .cpu(CfnString.create(jsonNode.path("Cpu")));
-
-                                    if (jsonNode.path("AwsVpcConfiguration").isMissingNode()) {
-                                        List<String> subnets = getSubnets(ec2Client);
-                                        securityGroups.put(entry.getKey(), Resources.securityGroups(entry.getKey()));
-                                        runnerBuilder.subnets(CfnString.create(objectMapper.valueToTree(String.join(",",
-                                                                                                                    subnets))));
-                                        runnerBuilder.securityGroups(CfnString.create(createJsonNode(
-                                                "{\"Fn::GetAtt\" : \"" + getSecurityGroupName(entry.getKey()) + ".GroupId\"}",
-                                                objectMapper)));
-                                        runnerBuilder.assignPublicIp(CfnString.create(objectMapper.valueToTree("ENABLED")));
-                                    } else {
-                                        JsonNode awsVpcConfiguration = jsonNode.path("AwsVpcConfiguration");
-                                        validateVpcConfigProperty(awsVpcConfiguration.path("Subnets"),
-                                                                  "Subnets",
-                                                                  entry.getKey());
-                                        validateVpcConfigProperty(awsVpcConfiguration.path("SecurityGroups"),
-                                                                  "SecurityGroups",
-                                                                  entry.getKey());
-                                        validateVpcConfigProperty(awsVpcConfiguration.path("AssignPublicIp"),
-                                                                  "AssignPublicIp",
-                                                                  entry.getKey());
-                                        runnerBuilder.subnets(CfnString.create(awsVpcConfiguration.path("Subnets")))
-                                                     .securityGroups(CfnString.create(awsVpcConfiguration.path(
-                                                             "SecurityGroups")))
-                                                     .assignPublicIp(CfnString.create(awsVpcConfiguration.path(
-                                                             "AssignPublicIp")));
-
-                                    }
-
-                                    if (!jsonNode.path("Image").isMissingNode() && !jsonNode.path("TaskDefinitionArn")
-                                                                                            .isMissingNode()) {
-                                        throw new IllegalArgumentException(
-                                                "Both Image and TaskDefinitionArn is specified for Runner: " + entry.getKey());
-                                    }
-
-                                    if (!jsonNode.path("Image").isMissingNode()) {
-                                        String taskDefinitionName = entry.getKey() + "TaskDefinition";
-                                        String logGroupName = entry.getKey() + "LogGroup";
-                                        runnerBuilder.taskDefinitionArn(CfnString.create(objectMapper.valueToTree(Map.of(
-                                                "Ref",
-                                                taskDefinitionName))));
-                                        CfnString roleArn = createRoleArnRef(objectMapper, jsonNode.path("RoleArn"));
-                                        if (jsonNode.path("Ec2Configuration").isMissingNode()) {
-                                            taskDefinitions.put(taskDefinitionName,
-                                                                Resources.taskDefinition(CfnString.create(jsonNode.get(
-                                                                        "Image")), roleArn, logGroupName));
-                                        } else {
-                                            taskDefinitions.put(taskDefinitionName,
-                                                                Resources.ec2taskDefinition(CfnString.create(jsonNode.get(
-                                                                        "Image")), roleArn, logGroupName));
-                                        }
-                                        logGroups.put(logGroupName, Resources.logGroup());
-                                    }
-
-
-                                    if (!jsonNode.path("Ec2Configuration").isMissingNode()) {
-                                        String ecsClientLogGroup = entry.getKey() + "EcsClientLogGroup";
-                                        taskDefinitions.put(ecsClientLogGroup, Resources.logGroup());
-
-                                        JsonNode ec2Configuration = jsonNode.path("Ec2Configuration");
-                                        runnerBuilder
-                                                .ec2Configuration(Ec2Configuration
-                                                                          .builder()
-                                                                          .ami(CfnString.create(ec2Configuration
-                                                                                                            .path("Ami")))
-                                                                          .ecsClientLogGroup(CfnString.create(
-                                                                                  objectMapper.valueToTree(
-                                                                                          Map.of("Ref",
-                                                                                                 ecsClientLogGroup))))
-                                                                          .instanceProfile(
-                                                                                  createDefaultInstanceProfileRef(
-                                                                                          objectMapper,
-                                                                                          ec2Configuration
-                                                                                                  .path("InstanceProfileName")))
-                                                                          .instanceType(CfnString.create(
-                                                                                  ec2Configuration
-                                                                                          .path("InstanceType")))
-                                                                          .build());
-                                        if (jsonNode.path("Image").isMissingNode() && jsonNode.path("TaskDefinitionArn").isMissingNode()) {
-                                            String taskDefinitionName = entry.getKey() + "TaskDefinition";
-                                            String logGroupName = entry.getKey() + "LogGroup";
-                                            taskDefinitions.put(taskDefinitionName,
-                                                                Resources.ec2taskDefinition(CfnString.create(
-                                                                                                    defaultRunnerImage),
-                                                                                            createRoleArnRef(
-                                                                                                    objectMapper,
-                                                                                                    jsonNode.path("RoleArn")),
-                                                                                            logGroupName));
-                                            runnerBuilder.taskDefinitionArn(CfnString.create(objectMapper.valueToTree(
-                                                    Map.of(
-                                                            "Ref",
-                                                            taskDefinitionName))));
-                                            logGroups.put(logGroupName, Resources.logGroup());
-                                        }
-
-                                    }
-                                    return runnerBuilder.build();
-                                })
-                                .collect(Collectors.toMap(Runner::getName, Function.identity()));
+    private static void checkImageAndTaskDefinition(String resourceName, JsonNode properties) {
+        if (!properties.path("Image").isMissingNode() && !properties.path("TaskDefinitionArn")
+                                                                    .isMissingNode()) {
+            throw new IllegalArgumentException(
+                    "Both Image and TaskDefinitionArn is specified for Runner: " + resourceName);
+        }
     }
 
-    private static CfnString createRoleArnRef(ObjectMapper objectMapper, JsonNode roleArnNode) {
+    private Runner.RunnerBuilder initBuilder(String resourceName,
+                                             JsonNode jsonNode) {
+        return Runner.builder()
+                     .name(resourceName)
+                     .installationCommands(createStartupCommands(resourceName, jsonNode))
+                     .installationCommandsTimeout(CfnString.create(
+                             jsonNode.path("Startup")
+                                     .path("CommandsTimeout")))
+                     .containerName(CfnString.create(jsonNode.path(
+                             "ContainerName")))
+                     .cluster(CfnString.create(jsonNode.path(
+                             "EcsCluster")))
+                     .roleArn(CfnString.create(jsonNode.path(
+                             "RoleArn")))
+                     .taskDefinitionArn(getTaskDefinitionArn(jsonNode))
+                     .idleTimeToLive(CfnString.create(jsonNode.path("RunnerConfiguration")
+                                                              .path("IdleTimeToLive")))
+                     .jobTimeout(CfnString.create(jsonNode.path("RunnerConfiguration")
+                                                          .path("JobTimeout")))
+                     .logLevel(CfnString.create(jsonNode.path("RunnerConfiguration")
+                                                        .path("LogLevel")))
+                     .maxConcurrentJobs(CfnString.create(jsonNode.path(
+                                                                         "RunnerConfiguration")
+                                                                 .path("MaxConcurrentJobs")))
+                     .queueUrl(createIntrinsicFunction("Fn::GetAtt", getQueueName(resourceName) + ".QueueUrl"))
+
+                     .memory(CfnString.create(jsonNode.path(
+                             "Memory")))
+                     .cpu(CfnString.create(jsonNode.path("Cpu")));
+    }
+
+    private CfnString getTaskDefinitionArn(JsonNode jsonNode) {
+        return jsonNode.path("TaskDefinitionArn")
+                       .isMissingNode() ? CfnString.create(Resources.getDefaultTaskDefinitionArn(
+                region,
+                accountId)) : CfnString.create(jsonNode.path("TaskDefinitionArn"));
+    }
+
+    private static List<CfnString> createStartupCommands(String resourceName, JsonNode jsonNode) {
+        JsonNode installationCommandsNode = jsonNode.path("Startup").path("Commands");
+        if (!installationCommandsNode.isMissingNode() && !installationCommandsNode.isArray()) {
+            throw new IllegalArgumentException(
+                    "Illegal format for installations commands for runner" + resourceName + ". Installation commands should be a list");
+        }
+
+        return StreamSupport.stream(installationCommandsNode.spliterator(),
+                                    false)
+                            .map(CfnString::create)
+                            .collect(Collectors.toList());
+    }
+
+    private Ec2Configuration createEc2Configuration(String ecsClientLogGroup,
+                                                    JsonNode ec2Configuration) {
+        return Ec2Configuration
+                .builder()
+                .ami(CfnString.create(ec2Configuration
+                                              .path("Ami")))
+                .ecsClientLogGroup(CfnString.create(
+                        objectMapper.valueToTree(
+                                Map.of("Ref",
+                                       ecsClientLogGroup))))
+                .instanceProfile(
+                        createDefaultInstanceProfileRef(
+                                ec2Configuration
+                                        .path("InstanceProfileName")))
+                .instanceType(CfnString.create(
+                        ec2Configuration
+                                .path("InstanceType")))
+                .build();
+    }
+
+    private void validateVpcConfiguration(Map.Entry<String, Map<String, Object>> entry, JsonNode awsVpcConfiguration) {
+        validateVpcConfigProperty(awsVpcConfiguration.path("Subnets"),
+                                  "Subnets",
+                                  entry.getKey());
+        validateVpcConfigProperty(awsVpcConfiguration.path("SecurityGroups"),
+                                  "SecurityGroups",
+                                  entry.getKey());
+        validateVpcConfigProperty(awsVpcConfiguration.path("AssignPublicIp"),
+                                  "AssignPublicIp",
+                                  entry.getKey());
+    }
+
+    private CfnString createIntrinsicFunction(String function, String value) {
+        return CfnString.create(objectMapper.createObjectNode().put(function, value));
+    }
+
+    private CfnString createRoleArnRef(JsonNode roleArnNode) {
 
         if (roleArnNode.isMissingNode()) {
             return CfnString.create(objectMapper.valueToTree(
@@ -213,7 +241,7 @@ public class AttiniRunners {
         return CfnString.create(roleArnNode);
     }
 
-    private static CfnString createDefaultInstanceProfileRef(ObjectMapper objectMapper, JsonNode instanceProfileNode) {
+    private CfnString createDefaultInstanceProfileRef(JsonNode instanceProfileNode) {
 
         if (instanceProfileNode.isMissingNode()) {
             return CfnString.create(objectMapper.valueToTree(
@@ -261,14 +289,6 @@ public class AttiniRunners {
                       .stream()
                       .collect(Collectors.toMap(entry -> AttiniRunners.getQueueName(entry.getKey()),
                                                 o -> Resources.sqsQueue()));
-    }
-
-    private JsonNode createJsonNode(String value, ObjectMapper objectMapper) {
-        try {
-            return objectMapper.readTree(value);
-        } catch (JsonProcessingException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 
     public Set<String> getRunnerNames() {
