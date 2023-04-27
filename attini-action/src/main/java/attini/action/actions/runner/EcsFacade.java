@@ -33,7 +33,9 @@ public class EcsFacade {
 
     private static final Logger logger = Logger.getLogger(EcsFacade.class);
 
-    private static final String RUNNER_VERSION = "1.3.1";
+    private static final String RUNNER_VERSION = "2.0.0";
+
+    private static final String RUNNER_REQUIRED_VERSION = "2.0.0";
 
     private final EcsClient ecsClient;
     private final EnvironmentVariables environmentVariables;
@@ -281,6 +283,7 @@ public class EcsFacade {
                 OS=$(uname)
                 CPU=$(uname -m)
                 ATTINI_SFN_TOKEN=%s
+                ATTINI_REQUIRED_RUNNER_VERSION=%s
                                 
                 if [[ "${OS}" != "Linux"  ]]
                 then
@@ -293,49 +296,18 @@ public class EcsFacade {
                   error "Attini runner is only supported on CPU architectures x86_64 and aarch64 (arm64) and you are using [ ${CPU} ] "
                   exit 1
                 fi
-                                
-                # Default configuration
-                CLI_DOMAIN=${ATTINI_DOCK_URL:-"https://docs.attini.io"}
-                                
-                if [[ $(aws --version > /dev/null 2>&1; echo $?) = "127"  ]]
-                then
-                  info "AWS CLI is not installed, trying to install it."
-                  hint "Pre-install AWS CLI version 2 on your container image to decrease startup time."
-                  if [[ $(unzip --version > /dev/null 2>&1; echo $?) = "127"  ]]
-                  then
-                    info "unzip is not installed and it is required to install the AWS CLI, will therefore try to install it."
-                    hint "We recommend that you preinstall AWS CLI version 2 on your image."
-                    yum -y install unzip || \\
-                    apt-get -y install unzip || \\
-                    dnf -y install unzip || \\
-                    (error "unzip could not be installed, so we can not install AWS CLI." && exit 1)
-                  fi
-                  curl "https://awscli.amazonaws.com/awscli-exe-linux-${CPU}.zip" -o "awscliv2.zip"
-                  unzip -q awscliv2.zip
-                  ./aws/install
-                                
-                elif aws --version | grep "aws-cli/1" > /dev/null
-                then
-                  error "AWS CLI version 1 is installed on this container. Attini runner requires AWS CLI version 2"
-                  error "Install AWS CLI version 2 on the image and try again."
-                  exit 1
-                elif  aws --version | grep "aws-cli/2" > /dev/null
-                then
-                  echo "AWS CLI is installed with the correct version"
-                else
-                  error "Unexpected error"
-                  exit 1
-                fi
-                                
+                         
                 if [[ $(attini-runner dry-run > /dev/null 2>&1; echo $?) = "127" ]]
                 then
                   info "attini-runner not found so installing it."
                   curl -sfL#o $HOME/attini-runner https://docs.attini.io/api/v1/runner/get-runner/${CPU}/${OS}/%s
                   chmod +x $HOME/attini-runner
-                  exec $HOME/attini-runner $ATTINI_SFN_TOKEN
+                  export ATTINI_RUNNER_EXEC=$HOME/attini-runner
+                  exec $HOME/attini-runner $ATTINI_SFN_TOKEN $ATTINI_REQUIRED_RUNNER_VERSION
                 else
-                  exec attini-runner $ATTINI_SFN_TOKEN
+                  export ATTINI_RUNNER_EXEC=attini-runner
+                  exec attini-runner $ATTINI_SFN_TOKEN $ATTINI_REQUIRED_RUNNER_VERSION
                 fi
-                """.formatted(sfnToken, RUNNER_VERSION);
+                """.formatted(sfnToken, RUNNER_REQUIRED_VERSION, RUNNER_VERSION);
     }
 }

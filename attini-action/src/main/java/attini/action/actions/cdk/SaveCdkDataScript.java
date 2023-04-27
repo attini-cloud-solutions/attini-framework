@@ -3,7 +3,7 @@ package attini.action.actions.cdk;
 public class SaveCdkDataScript {
 
     public static final String SET_VARIABLE = """
-           
+                       
             ATTINI_SAVE_CDK_STACK_ITEM="{
               \\"resourceType\\": {
                 \\"S\\": \\"CdkStack\\"
@@ -32,28 +32,24 @@ public class SaveCdkDataScript {
             }"
             """;
     private static final String SAVE = """
-            RESPONSE=$(aws lambda invoke --function-name attini-step-guard \
-                      --payload "{\
+            $ATTINI_RUNNER_EXEC command-mode register-cdk-stacks \
+                       "{\
                         \\"requestType\\":\\"register-cdk-stacks\\",\
-                        \\"objectIdentifier\\":\\"${OBJECT_IDENTIFIER}\\",\
+                        \\"objectIdentifier\\":\\"${ATTINI_OBJECT_IDENTIFIER}\\",\
                         \\"distributionId\\":\\"${ATTINI_DISTRIBUTION_ID}\\",\
                         \\"distributionName\\":\\"${ATTINI_DISTRIBUTION_NAME}\\",\
                         \\"environment\\":\\"${ATTINI_ENVIRONMENT_NAME}\\",\
                         \\"stepName\\":\\"${ATTINI_STEP_NAME}\\",\
                         \\"stacks\\":$(%s),\
                         \\"outputs\\": $(cat %s)}" \
-                      --cli-binary-format raw-in-base64-out ${ATTINI_OUTPUT})
-            if echo $RESPONSE | grep -q "FunctionError"; then
-              echo $RESPONSE
-              cat ${ATTINI_OUTPUT}
-              exit 1
-            fi
+                      > ${ATTINI_OUTPUT}
             """;
 
-    public static String getSaveScript(CdkCommandBuilder commandBuilder){
+    public static String getSaveScript(CdkCommandBuilder commandBuilder) {
         return SAVE.formatted(commandBuilder.buildListCommand(),
                               commandBuilder.getOutputFile());
 
     }
+
 }
 
