@@ -3,7 +3,7 @@ package attini.action.actions.cdk;
 public class SaveCdkDataScript {
 
     public static final String SET_VARIABLE = """
-           
+                       
             ATTINI_SAVE_CDK_STACK_ITEM="{
               \\"resourceType\\": {
                 \\"S\\": \\"CdkStack\\"
@@ -32,7 +32,7 @@ public class SaveCdkDataScript {
             }"
             """;
     private static final String SAVE = """
-            exec $ATTINI_RUNNER_EXEC command-mode register-cdk-stacks \
+            $ATTINI_RUNNER_EXEC command-mode register-cdk-stacks \
                        "{\
                         \\"requestType\\":\\"register-cdk-stacks\\",\
                         \\"objectIdentifier\\":\\"${ATTINI_OBJECT_IDENTIFIER}\\",\
@@ -45,7 +45,7 @@ public class SaveCdkDataScript {
                       > ${ATTINI_OUTPUT}
             """;
 
-    public static String getSaveScript(CdkCommandBuilder commandBuilder){
+    public static String getSaveScript(CdkCommandBuilder commandBuilder) {
         return SAVE.formatted(commandBuilder.buildListCommand(),
                               commandBuilder.getOutputFile());
 
