@@ -296,7 +296,7 @@ public class EcsFacade {
                   error "Attini runner is only supported on CPU architectures x86_64 and aarch64 (arm64) and you are using [ ${CPU} ] "
                   exit 1
                 fi
-         
+                         
                 if [[ $(attini-runner dry-run > /dev/null 2>&1; echo $?) = "127" ]]
                 then
                   info "attini-runner not found so installing it."
@@ -308,6 +308,6 @@ public class EcsFacade {
                   export ATTINI_RUNNER_EXEC=attini-runner
                   exec attini-runner $ATTINI_SFN_TOKEN $ATTINI_REQUIRED_RUNNER_VERSION
                 fi
-                """.formatted(sfnToken,RUNNER_REQUIRED_VERSION ,RUNNER_VERSION);
+                """.formatted(sfnToken, RUNNER_REQUIRED_VERSION, RUNNER_VERSION);
     }
 }
