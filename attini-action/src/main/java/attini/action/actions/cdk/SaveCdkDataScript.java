@@ -32,7 +32,7 @@ public class SaveCdkDataScript {
             }"
             """;
     private static final String SAVE = """
-            exec $ATTINI_RUNNER_EXEC register-cdk-stacks \
+            exec $ATTINI_RUNNER_EXEC command-mode register-cdk-stacks \
                        "{\
                         \\"requestType\\":\\"register-cdk-stacks\\",\
                         \\"objectIdentifier\\":\\"${ATTINI_OBJECT_IDENTIFIER}\\",\
