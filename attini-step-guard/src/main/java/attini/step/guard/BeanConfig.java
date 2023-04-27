@@ -12,7 +12,6 @@ import javax.enterprise.context.ApplicationScoped;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import attini.domain.CustomAwsClient;
-import attini.step.guard.cdk.RegisterCdkStacksService;
 import attini.step.guard.cloudformation.CfnEventHandler;
 import attini.step.guard.cloudformation.CfnOutputCreator;
 import attini.step.guard.cloudformation.CfnSnsEventTypeResolver;
@@ -34,12 +33,6 @@ import software.amazon.awssdk.services.sfn.SfnClient;
 import software.amazon.awssdk.services.sts.StsClient;
 
 public class BeanConfig {
-
-    @ApplicationScoped
-    RegisterCdkStacksService registerCdkStacksService(StackDataFacade stackDataFacade,
-                                                      EnvironmentVariables environmentVariables) {
-        return new RegisterCdkStacksService(stackDataFacade, environmentVariables);
-    }
 
     @ApplicationScoped
     EventTypeResolver eventTypeResolver() {

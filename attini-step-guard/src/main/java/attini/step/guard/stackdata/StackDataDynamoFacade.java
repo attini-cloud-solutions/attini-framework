@@ -19,9 +19,7 @@ import attini.domain.DistributionId;
 import attini.domain.DistributionName;
 import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
-import attini.step.guard.AttiniContext;
 import attini.step.guard.EnvironmentVariables;
-import attini.step.guard.cdk.CdkStack;
 import attini.step.guard.cloudformation.CloudFormationEvent;
 import attini.step.guard.cloudformation.InitDeploySnsEvent;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -30,7 +28,6 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValueUpdate;
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
-import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
@@ -262,38 +259,6 @@ public class StackDataDynamoFacade implements StackDataFacade {
                                                    .updateExpression("SET errors = list_append(errors, :val)")
                                                    .expressionAttributeValues(Map.of(":val", list))
                                                    .build());
-    }
-
-    @Override
-    public void saveCdkStack(AttiniContext attiniContext, String stepName, CdkStack cdkStack) {
-        dynamoDbClient.putItem(PutItemRequest.builder()
-                                             .tableName(environmentVariables.getResourceStatesTableName())
-                                             .item(Map.of("resourceType",
-                                                          stringAttribute("CdkStack"),
-                                                          "name",
-                                                          stringAttribute("%s-%s-%s".formatted(cdkStack.name(),
-                                                                                               cdkStack.environment()
-                                                                                                       .region(),
-                                                                                               cdkStack.environment()
-                                                                                                       .account())),
-                                                          STEP_NAME,
-                                                          stringAttribute(stepName),
-                                                          DISTRIBUTION_NAME,
-                                                          stringAttribute(attiniContext.getDistributionName()
-                                                                                       .asString()),
-                                                          DISTRIBUTION_ID,
-                                                          stringAttribute(attiniContext.getDistributionId().asString()),
-                                                          OBJECT_IDENTIFIER,
-                                                          stringAttribute(attiniContext.getObjectIdentifier()
-                                                                                       .asString()),
-                                                          ENVIRONMENT,
-                                                          stringAttribute(attiniContext.getEnvironment().asString())
-                                             ))
-                                             .build());
-    }
-
-    private static AttributeValue stringAttribute(String value) {
-        return AttributeValue.builder().s(value).build();
     }
 
     private HashMap<String, AttributeValue> createInitStackDataKey(String stackName) {

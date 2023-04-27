@@ -5,11 +5,8 @@
 
 package attini.step.guard.stackdata;
 
-import attini.step.guard.AttiniContext;
 import attini.step.guard.cloudformation.CloudFormationEvent;
 import attini.step.guard.cloudformation.InitDeploySnsEvent;
-import attini.step.guard.cdk.CdkStack;
-
 public interface StackDataFacade {
 
 
@@ -30,5 +27,4 @@ public interface StackDataFacade {
 
     void saveError(CloudFormationEvent stepGuardInput, String error);
 
-    void saveCdkStack(AttiniContext attiniContext, String stepName, CdkStack cdkStack);
 }
