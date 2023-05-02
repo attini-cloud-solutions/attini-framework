@@ -7,7 +7,7 @@ package attini.step.guard;
 
 import java.net.URI;
 import java.time.Duration;
-import javax.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -100,11 +100,6 @@ public class BeanConfig {
         return new CfnOutputCreator(cloudFormationClientFactory, objectMapper);
     }
 
-    @ApplicationScoped
-    EnvironmentVariables environmentVariables() {
-        return new EnvironmentVariables();
-    }
-
 
     @ApplicationScoped
     ContinueExecutionService continueExecutionService(@CustomAwsClient DynamoDbClient dynamoDbClient,
@@ -173,6 +168,11 @@ public class BeanConfig {
                              .endpointOverride(getAwsServiceEndpoint("dynamodb", region))
                              .build();
 
+    }
+
+    @ApplicationScoped
+    EnvironmentVariables environmentVariables() {
+        return new EnvironmentVariables();
     }
 
 

@@ -1,5 +1,5 @@
 DOCKER_BUILD    			?=true
-QUARKUS_BUILD_IMAGE			?=quay.io/quarkus/ubi-quarkus-native-image:22.2.0-java17
+QUARKUS_BUILD_IMAGE			?=quay.io/quarkus/ubi-quarkus-native-image:22.3.0-java17
 FUNCTION_NAME   			:=attini-init-deploy
 AWS_REGION					?=eu-west-1
 

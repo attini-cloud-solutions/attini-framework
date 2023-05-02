@@ -2,7 +2,6 @@ package deployment.plan.bean.config;
 
 import java.net.URI;
 import java.time.Duration;
-import javax.enterprise.context.ApplicationScoped;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -18,7 +17,7 @@ import deployment.plan.transform.DeployData;
 import deployment.plan.transform.DeploymentPlanStepsCreator;
 import deployment.plan.transform.TemplateFileLoader;
 import deployment.plan.transform.TemplateFileLoaderImpl;
-import deployment.plan.transform.TransformDeploymentPlanCloudFormation;
+import jakarta.enterprise.context.ApplicationScoped;
 import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.retry.RetryPolicy;
@@ -60,28 +59,29 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
-    public Ec2Client ec2Client(EnvironmentVariables environmentVariables){
+    public Ec2Client ec2Client(EnvironmentVariables environmentVariables) {
+        String region = environmentVariables.getRegion();
         return Ec2Client.builder()
-                                       .region(Region.of(environmentVariables.getRegion()))
-                                       .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
-                                       .overrideConfiguration(createClientOverrideConfiguration())
-                                       .httpClient(UrlConnectionHttpClient.builder().build())
-                                       .endpointOverride(getAwsServiceEndpoint("ec2", environmentVariables.getRegion()))
-                                       .build();
+                        .region(Region.of(region))
+                        .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                        .overrideConfiguration(createClientOverrideConfiguration())
+                        .httpClient(UrlConnectionHttpClient.builder().build())
+                        .endpointOverride(getAwsServiceEndpoint("ec2", region))
+                        .build();
     }
 
-    @ApplicationScoped
-    public TransformDeploymentPlanCloudFormation transformDeploymentPlanCloudFormation(EnvironmentVariables environmentVariables,
-                                                                                       ObjectMapper objectMapper,
-                                                                                       DeploymentPlanStepsCreator deploymentPlanStepsCreator,
-                                                                                       Ec2Client ec2Client) {
-
-
-        return new TransformDeploymentPlanCloudFormation(environmentVariables,
-                                                         ec2Client,
-                                                         objectMapper,
-                                                         deploymentPlanStepsCreator);
-    }
+//    @ApplicationScoped
+//    public TransformDeploymentPlanCloudFormation transformDeploymentPlanCloudFormation(EnvironmentVariables environmentVariables,
+//                                                                                       ObjectMapper objectMapper,
+//                                                                                       DeploymentPlanStepsCreator deploymentPlanStepsCreator,
+//                                                                                       Ec2Client ec2Client) {
+//
+//
+//        return new TransformDeploymentPlanCloudFormation(environmentVariables,
+//                                                         ec2Client,
+//                                                         objectMapper,
+//                                                         deploymentPlanStepsCreator);
+//    }
 
     @ApplicationScoped
     DeployStatesFacade deployStatesFacade(EnvironmentVariables environmentVariables,

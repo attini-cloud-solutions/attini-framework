@@ -6,8 +6,8 @@ import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import javax.inject.Inject;
-import javax.inject.Named;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 import org.jboss.logging.Logger;
 import com.amazonaws.services.lambda.runtime.Context;
