@@ -13,8 +13,8 @@ import static attini.step.guard.EventConverter.createSnsEvent;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Map;
-import javax.inject.Inject;
-import javax.inject.Named;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 import org.jboss.logging.Logger;
 import com.amazonaws.services.lambda.runtime.Context;

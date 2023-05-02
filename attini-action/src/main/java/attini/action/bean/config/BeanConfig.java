@@ -2,7 +2,7 @@ package attini.action.bean.config;
 
 import java.net.URI;
 import java.time.Duration;
-import javax.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 

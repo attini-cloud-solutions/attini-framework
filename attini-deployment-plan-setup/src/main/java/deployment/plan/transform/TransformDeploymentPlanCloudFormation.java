@@ -25,9 +25,11 @@ import org.jboss.logging.Logger;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import deployment.plan.system.EnvironmentVariables;
+import jakarta.enterprise.context.ApplicationScoped;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 
 @SuppressWarnings("unchecked")
+@ApplicationScoped
 public class TransformDeploymentPlanCloudFormation {
     private static final Logger logger = Logger.getLogger(TransformDeploymentPlanCloudFormation.class);
 

@@ -1,5 +1,5 @@
 DOCKER_BUILD    					?=true
-QUARKUS_BUILD_IMAGE					?=quay.io/quarkus/ubi-quarkus-native-image:21.3-java17
+QUARKUS_BUILD_IMAGE					?=quay.io/quarkus/ubi-quarkus-native-image:22.3-java17
 AWS_REGION							?=eu-west-1
 ENVIRONMENT_PARAMETER_NAME			?=AttiniEnvironmentName
 APP_NAME   						 	=attini-setup
