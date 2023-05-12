@@ -8,18 +8,26 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import deployment.plan.system.EnvironmentVariables;
+
+@ExtendWith(MockitoExtension.class)
 class AttiniStepLoaderTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final TemplateFileLoader templateFileLoader = new TemplateFileTestLoader();
+    @Mock
+    EnvironmentVariables environmentVariables;
     private AttiniStepLoader attiniStepLoader;
 
     @BeforeEach
     void setUp() {
-        attiniStepLoader = new AttiniStepLoader(templateFileLoader, objectMapper);
+        attiniStepLoader = new AttiniStepLoader(templateFileLoader, objectMapper, environmentVariables);
     }
 
     @Test
@@ -56,7 +64,7 @@ class AttiniStepLoaderTest {
     void getAttiniRunner() {
         AbstractRequestResponse requestResponse = new RunnerRequestResponse();
 
-        JsonNode result = attiniStepLoader.getAttiniRunner(requestResponse.request(), "Step1b1");
+        JsonNode result = attiniStepLoader.getAttiniRunner(requestResponse.request(), "Step1b1", "DefaultRunner");
         assertJsonEquals(requestResponse.expectedResponse(), result);
 
     }
@@ -65,9 +73,24 @@ class AttiniStepLoaderTest {
     void getAttiniCdk() {
         AbstractRequestResponse requestResponse = new CdkRequestResponse();
 
-        Map<AttiniStep, JsonNode> result = attiniStepLoader.getAttiniCdk(requestResponse.request(), "Step1b1", new HashMap<>());
+        Map<AttiniStep, JsonNode> result = attiniStepLoader.getAttiniCdk(requestResponse.request(), "Step1b1", new HashMap<>(), "DefaultRunner");
 
         assertJsonEquals(requestResponse.expectedResponse(), result.get(new AttiniStep("Step1b1", "AttiniCdk")));
+
+    }
+
+    @Test
+    void getAttiniSam() {
+        AbstractRequestResponse requestResponse = new SamRequestResponse();
+
+        JsonNode result =
+                objectMapper.createObjectNode()
+                            .setAll(attiniStepLoader.getAttiniSam(requestResponse.request(), "Step1b1", new HashMap<>(), "DefaultRunner")
+                                                    .entrySet()
+                                                    .stream()
+                                                    .collect(Collectors.toMap(t -> t.getKey().name(),
+                                                                              Map.Entry::getValue)));
+        assertJsonEquals(requestResponse.expectedResponse(), result);
 
     }
 
@@ -77,7 +100,7 @@ class AttiniStepLoaderTest {
 
         JsonNode result =
                 objectMapper.createObjectNode()
-                            .setAll(attiniStepLoader.getAttiniCdk(requestResponse.request(), "Step1b1", new HashMap<>())
+                            .setAll(attiniStepLoader.getAttiniCdk(requestResponse.request(), "Step1b1", new HashMap<>(), "DefaultRunner")
                                                     .entrySet()
                                                     .stream()
                                                     .collect(Collectors.toMap(t -> t.getKey().name(),

@@ -84,7 +84,7 @@ public class Resources {
                                            "RequiresCompatibilities", List.of("FARGATE")));
     }
 
-    public static Map<String, Object> ec2taskDefinition(CfnString image, CfnString roleArn, String logGroup) {
+    public static Map<String, Object> ec2taskDefinition(CfnString image, CfnString roleArn, String logGroup, String region) {
 
         Map<String, Object> logConfiguration = Map.of("LogDriver",
                                                       "awslogs",
@@ -94,6 +94,7 @@ public class Resources {
                                                              "awslogs-region",
                                                              Map.of("Ref", "AWS::Region"),
                                                              "awslogs-stream-prefix", "logs"));
+
         List<Map<String, Object>> containers = List.of(Map.of("Name",
                                                               "Container",
                                                               "Image",
@@ -104,7 +105,8 @@ public class Resources {
                                                               List.of(Map.of("SourceVolume", "dockersock",
                                                                              "ContainerPath", "/var/run/docker.sock")),
                                                               "LogConfiguration",
-                                                              logConfiguration));
+                                                              logConfiguration,
+                                                              "Environment", List.of(Map.of("Name", "AWS_DEFAULT_REGION", "Value", region))));
 
         return Map.of("Type", "AWS::ECS::TaskDefinition",
                       "Properties", Map.of("ContainerDefinitions",

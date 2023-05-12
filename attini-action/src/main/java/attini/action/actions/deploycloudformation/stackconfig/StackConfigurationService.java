@@ -71,6 +71,10 @@ public class StackConfigurationService {
     }
 
     public StackConfiguration getStackConfig(CfnStackConfig cfnStackConfig) {
+        return getStackConfig(cfnStackConfig, true);
+    }
+
+    public StackConfiguration getStackConfig(CfnStackConfig cfnStackConfig, boolean requireDeployedTemplate) {
         HashMap<String, String> variables = new HashMap<>(initStackDataFacade.getInitConfigVariables(
                 cfnStackConfig.getInitStackName()));
         variables.putAll(cfnStackConfig.getVariables());
@@ -87,28 +91,26 @@ public class StackConfigurationService {
         configurationOptional.ifPresentOrElse(fileStackConfiguration -> logger.info("got configuration =" + fileStackConfiguration),
                                               () -> logger.info("no file config found"));
 
-        if (cfnStackConfig.getTemplateUrl()
-                          .isEmpty() && configurationOptional.map(FileStackConfiguration::getTemplatePath)
-                                                             .isEmpty()) {
+        if (requireDeployedTemplate && cfnStackConfig.getTemplate()
+                                                     .isEmpty() && configurationOptional.map(FileStackConfiguration::getTemplatePath)
+                                                                                        .isEmpty()) {
             throw new StackConfigException("no template path is specified");
         }
 
-        if (cfnStackConfig.getStackName()
-                          .isEmpty() && configurationOptional.map(FileStackConfiguration::getStackName)
-                                                             .isEmpty()) {
-            throw new StackConfigException("no stack name is specified");
-        }
         StringSubstitutor stringSubstitutor = new StringSubstitutor(variables);
 
 
-        String templatePath = cfnStackConfig.getTemplateUrl()
-                                            .orElseGet(() -> configurationOptional.get().getTemplatePath());
+        String templatePath = cfnStackConfig.getTemplate()
+                                            .or(() -> configurationOptional.map(FileStackConfiguration::getTemplatePath))
+                                            .orElse("no-template-path");
         String templateUrl = TemplatePathUtil.getTemplatePath(stringSubstitutor.replace(templatePath),
                                                               cfnStackConfig.getTemplateUrlPrefix());
 
-        String stackName = stringSubstitutor.replace(cfnStackConfig.getStackName()
-                                                                   .orElseGet(() -> configurationOptional.get()
-                                                                                                         .getStackName()));
+        String stackName =
+                stringSubstitutor.replace(cfnStackConfig.getStackName()
+                                                        .or(() -> configurationOptional.map(FileStackConfiguration::getStackName))
+                                                        .orElseThrow(() -> new StackConfigException(
+                                                                "no stack name is specified")));
 
         Optional<String> region = cfnStackConfig.getRegion()
                                                 .or(() -> configurationOptional.flatMap(FileStackConfiguration::getRegion))
@@ -179,11 +181,17 @@ public class StackConfigurationService {
                                                                                                       stringSubstitutor))
                 .map(this::createParametersList)
                 .map(parameters1 -> CollectionsUtils.combineCollections(parameters1, attiniFrameworkParameters))
-                .map(parameters1 -> filterNeededParams(templateUrl, parameters1, attiniFrameworkParameters, client))
+                .map(parameters1 -> filterNeededParams(templateUrl,
+                                                       parameters1,
+                                                       attiniFrameworkParameters,
+                                                       client,
+                                                       requireDeployedTemplate))
                 .orElseGet(() -> filterNeededParams(templateUrl,
-                                                    CollectionsUtils.combineCollections(createParametersList(cfnStackConfig.getParameters()),
-                                                                                        getAttiniFrameworkParameters(cfnStackConfig)),
-                                                    attiniFrameworkParameters, client))
+                                                    CollectionsUtils.combineCollections(createParametersList(
+                                                                                                cfnStackConfig.getParameters()),
+                                                                                        getAttiniFrameworkParameters(
+                                                                                                cfnStackConfig)),
+                                                    attiniFrameworkParameters, client, requireDeployedTemplate))
                 .stream()
                 .map(parameter -> parameter.toBuilder()
                                            .parameterValue(stringSubstitutor.replace(parameter.parameterValue()))
@@ -236,7 +244,8 @@ public class StackConfigurationService {
         return switch (action.trim()) {
             case "Delete" -> DesiredState.DELETED;
             case "Deploy" -> DesiredState.DEPLOYED;
-            default -> throw new StackConfigException("Invalid value for property \"Action\", current value = " + action + ", allowed values are \"Deploy\" or \"Delete\"");
+            default ->
+                    throw new StackConfigException("Invalid value for property \"Action\", current value = " + action + ", allowed values are \"Deploy\" or \"Delete\"");
         };
     }
 
@@ -245,7 +254,8 @@ public class StackConfigurationService {
             case "DELETE" -> OnFailure.DELETE;
             case "DO_NOTHING" -> OnFailure.DO_NOTHING;
             case "ROLLBACK" -> OnFailure.ROLLBACK;
-            default -> throw new StackConfigException("Invalid value for property \"onFailure\", current value = " + onFailure + ", allowed values are \"DELETE\", \"ROLLBACK\" or \"DO_NOTHING\"");
+            default ->
+                    throw new StackConfigException("Invalid value for property \"onFailure\", current value = " + onFailure + ", allowed values are \"DELETE\", \"ROLLBACK\" or \"DO_NOTHING\"");
         };
     }
 
@@ -345,7 +355,12 @@ public class StackConfigurationService {
     private List<Parameter> filterNeededParams(String templateUrl,
                                                List<Parameter> parameters,
                                                List<Parameter> attiniFrameworkParams,
-                                               CloudFormationClient cloudFormationClient) {
+                                               CloudFormationClient cloudFormationClient,
+                                               boolean requireDeployedTemplate) {
+
+        if (!requireDeployedTemplate) {
+            return parameters;
+        }
         try {
             logger.debug(String.format("Getting template summary for: %s", templateUrl));
             GetTemplateSummaryRequest getTemplateSummaryRequest = GetTemplateSummaryRequest.builder()
@@ -358,11 +373,13 @@ public class StackConfigurationService {
             return ParametersUtil.removeUnusedParams(neededParams, parameters, attiniFrameworkParams);
 
         } catch (AwsServiceException e) {
-            if (e.getMessage().contains("Access Denied")){
-                throw new StackConfigException("Could not get template for url=" + templateUrl + ". This could be because of lacking permissions or because the file is missing", e);
+            if (e.getMessage().contains("Access Denied")) {
+                throw new StackConfigException("Could not get template for url=" + templateUrl + ". This could be because of lacking permissions or because the file is missing",
+                                               e);
 
             }
-            throw new StackConfigException("Template at url=" + templateUrl + " is invalid, Error message=" + e.getMessage(), e);
+            throw new StackConfigException("Template at url=" + templateUrl + " is invalid, Error message=" + e.getMessage(),
+                                           e);
 
         }
     }

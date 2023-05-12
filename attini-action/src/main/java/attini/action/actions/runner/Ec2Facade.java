@@ -146,6 +146,7 @@ public class Ec2Facade {
                                                                                 """
                                                                                         #!/bin/bash
                                                                                         echo "ECS_CLUSTER=attini-default" >> /etc/ecs/ecs.config
+                                                                                        echo "ECS_ENABLE_CONTAINER_METADATA=true" >> /etc/ecs/ecs.config
                                                                                         echo 'ECS_INSTANCE_ATTRIBUTES={"runnerResourceName": "%s"}' >> /etc/ecs/ecs.config
                                                                                         echo "ECS_LOG_DRIVER=awslogs" >> /etc/ecs/ecs.config
                                                                                         echo 'ECS_LOG_OPTS={"awslogs-group":"%s","awslogs-region":"%s"}' >> /etc/ecs/ecs.config

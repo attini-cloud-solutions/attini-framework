@@ -41,8 +41,10 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
-    public AttiniStepLoader attiniStepLoader(TemplateFileLoader templateFileLoader, ObjectMapper objectMapper) {
-        return new AttiniStepLoader(templateFileLoader, objectMapper);
+    public AttiniStepLoader attiniStepLoader(TemplateFileLoader templateFileLoader,
+                                             ObjectMapper objectMapper,
+                                             EnvironmentVariables environmentVariables) {
+        return new AttiniStepLoader(templateFileLoader, objectMapper, environmentVariables);
     }
 
     @ApplicationScoped
@@ -53,9 +55,8 @@ public class BeanConfig {
     @ApplicationScoped
     public DeploymentPlanStepsCreator deploymentPlanStepsCreator(AttiniStepLoader attiniStepLoader,
                                                                  DeployData deployData,
-                                                                 ObjectMapper objectMapper,
-                                                                 EnvironmentVariables environmentVariables) {
-        return new DeploymentPlanStepsCreator(attiniStepLoader, deployData, objectMapper, environmentVariables);
+                                                                 ObjectMapper objectMapper) {
+        return new DeploymentPlanStepsCreator(attiniStepLoader, deployData, objectMapper);
     }
 
     @ApplicationScoped
@@ -69,19 +70,6 @@ public class BeanConfig {
                         .endpointOverride(getAwsServiceEndpoint("ec2", region))
                         .build();
     }
-
-//    @ApplicationScoped
-//    public TransformDeploymentPlanCloudFormation transformDeploymentPlanCloudFormation(EnvironmentVariables environmentVariables,
-//                                                                                       ObjectMapper objectMapper,
-//                                                                                       DeploymentPlanStepsCreator deploymentPlanStepsCreator,
-//                                                                                       Ec2Client ec2Client) {
-//
-//
-//        return new TransformDeploymentPlanCloudFormation(environmentVariables,
-//                                                         ec2Client,
-//                                                         objectMapper,
-//                                                         deploymentPlanStepsCreator);
-//    }
 
     @ApplicationScoped
     DeployStatesFacade deployStatesFacade(EnvironmentVariables environmentVariables,

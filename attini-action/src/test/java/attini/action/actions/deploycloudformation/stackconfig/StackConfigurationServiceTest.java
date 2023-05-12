@@ -104,7 +104,7 @@ class StackConfigurationServiceTest {
                                     .setTags(Map.of("Author", ConfigurationPropertyValue.create("Oscar", true)))
                                     .build());
 
-        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplateUrl().get(),
+        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplate().get(),
                                                                        stackConfig.getTemplateUrlPrefix());
 
         when(cloudFormationClient.getTemplateSummary(GetTemplateSummaryRequest.builder()
@@ -158,7 +158,7 @@ class StackConfigurationServiceTest {
                                     .setTags(emptyMap())
                                     .build());
 
-        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplateUrl().get(),
+        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplate().get(),
                                                                        stackConfig.getTemplateUrlPrefix());
 
         when(cloudFormationClient.getTemplateSummary(GetTemplateSummaryRequest.builder()
@@ -202,7 +202,7 @@ class StackConfigurationServiceTest {
                                     .setTags(emptyMap())
                                     .build());
 
-        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplateUrl().get(),
+        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplate().get(),
                                                                        stackConfig.getTemplateUrlPrefix());
 
         when(cloudFormationClient.getTemplateSummary(GetTemplateSummaryRequest.builder()
@@ -237,7 +237,7 @@ class StackConfigurationServiceTest {
                                                                        ConfigurationPropertyValue.create("512", false)))
                                                  .setRegion("eu-west-1")
                                                  .build();
-        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplateUrl().get(),
+        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplate().get(),
                                                                        stackConfig.getTemplateUrlPrefix());
         when(cloudFormationClient.describeStacks(any(DescribeStacksRequest.class))).thenThrow(CloudFormationException.class);
 
@@ -272,7 +272,7 @@ class StackConfigurationServiceTest {
                                                  .setStackRole("my-template-role")
                                                  .setRegion("eu-west-1")
                                                  .build();
-        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplateUrl().get(),
+        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplate().get(),
                                                                        stackConfig.getTemplateUrlPrefix());
         when(cloudFormationClient.describeStacks(any(DescribeStacksRequest.class))).thenThrow(CloudFormationException.class);
 
@@ -302,7 +302,7 @@ class StackConfigurationServiceTest {
                                                  .setConfigPath("/a/path/config.json")
                                                  .setStackRole(null)
                                                  .build();
-        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplateUrl().get(),
+        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplate().get(),
                                                                        stackConfig.getTemplateUrlPrefix());
         when(cloudFormationClient.describeStacks(any(DescribeStacksRequest.class))).thenThrow(CloudFormationException.class);
 
@@ -343,7 +343,7 @@ class StackConfigurationServiceTest {
                                                  .setConfigPath("/a/path/config.json")
                                                  .setStackRole("template-stack-role")
                                                  .build();
-        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplateUrl().get(),
+        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplate().get(),
                                                                        stackConfig.getTemplateUrlPrefix());
         when(cloudFormationClient.describeStacks(any(DescribeStacksRequest.class))).thenThrow(CloudFormationException.class);
 
@@ -395,7 +395,7 @@ class StackConfigurationServiceTest {
                                     .setRegion("eu-west-1")
                                     .build());
 
-        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplateUrl().get(),
+        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplate().get(),
                                                                        stackConfig.getTemplateUrlPrefix());
 
         when(cloudFormationClient.getTemplateSummary(GetTemplateSummaryRequest.builder()
@@ -441,7 +441,7 @@ class StackConfigurationServiceTest {
                                     .setRegion("eu-west-1")
                                     .build());
 
-        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplateUrl().get(),
+        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplate().get(),
                                                                        stackConfig.getTemplateUrlPrefix());
 
         when(cloudFormationClient.getTemplateSummary(GetTemplateSummaryRequest.builder()
@@ -488,7 +488,7 @@ class StackConfigurationServiceTest {
                                     .setTags(emptyMap())
                                     .build());
 
-        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplateUrl().get(),
+        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplate().get(),
                                                                        stackConfig.getTemplateUrlPrefix());
 
         when(cloudFormationClient.getTemplateSummary(GetTemplateSummaryRequest.builder()
@@ -534,7 +534,7 @@ class StackConfigurationServiceTest {
                                     .setTags(emptyMap())
                                     .build());
 
-        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplateUrl().get(),
+        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplate().get(),
                                                                        stackConfig.getTemplateUrlPrefix());
 
         when(cloudFormationClient.getTemplateSummary(GetTemplateSummaryRequest.builder()
@@ -579,7 +579,7 @@ class StackConfigurationServiceTest {
                                     .setTags(emptyMap())
                                     .build());
 
-        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplateUrl().get(),
+        String expectedTemplatePath = TemplatePathUtil.getTemplatePath(stackConfig.getTemplate().get(),
                                                                        stackConfig.getTemplateUrlPrefix());
 
         when(cloudFormationClient.getTemplateSummary(GetTemplateSummaryRequest.builder()

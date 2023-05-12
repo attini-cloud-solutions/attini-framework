@@ -43,6 +43,11 @@ public class TemplateFileTestLoader implements TemplateFileLoader {
     }
 
     @Override
+    public File getAttiniSamTemplate() {
+        return new File(Objects.requireNonNull(this.getClass().getResource("/templates/attini-sam-template.json")).getFile());
+    }
+
+    @Override
     public File getAttiniCdkChangesetTemplate() {
         return new File(Objects.requireNonNull(this.getClass()
                                                    .getResource("/templates/attini-cdk-changeset-template.json")).getFile());

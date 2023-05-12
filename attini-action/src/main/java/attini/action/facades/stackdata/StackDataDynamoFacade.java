@@ -23,6 +23,7 @@ import attini.action.actions.runner.RunnerData;
 import attini.action.actions.runner.RunnerDataConverter;
 import attini.action.domain.DeploymentPlanExecutionMetadata;
 import attini.action.system.EnvironmentVariables;
+import attini.domain.ObjectIdentifier;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeAction;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -169,6 +170,7 @@ public class StackDataDynamoFacade implements StackDataFacade {
         inputMap.put("sfnExecutionArn",
                      toStringUpdateAttribute(stackData.getDeploymentPlanExecutionMetadata().executionArn().asString()));
 
+        inputMap.put("template", toStringUpdateAttribute(stackData.getStackConfiguration().getTemplate()));
         if (stackId != null) {
             inputMap.put("stackId",
                          toStringUpdateAttribute(stackId));
@@ -231,6 +233,25 @@ public class StackDataDynamoFacade implements StackDataFacade {
                                                    .key(createStackDynamoKey(stackConfiguration))
                                                    .attributeUpdates(placeholderQueue)
                                                    .build());
+    }
+
+    @Override
+    public Optional<StackTemplate> getStackTemplate(StackConfiguration stackConfiguration) {
+
+        GetItemResponse response = dynamoDbClient.getItem(GetItemRequest.builder()
+                                                                        .tableName(environmentVariables.getResourceStatesTableName())
+                                                                        .key(createStackDynamoKey(stackConfiguration))
+                                                                        .build());
+
+        if (response.hasItem() && response.item().containsKey("template")) {
+            return Optional.of(new StackTemplate(ObjectIdentifier.of(response.item()
+                                                                             .get("attiniObjectIdentifier")
+                                                                             .s()),
+                                                 response.item()
+                                                         .get("template")
+                                                         .s()));
+        }
+        return Optional.empty();
     }
 
 

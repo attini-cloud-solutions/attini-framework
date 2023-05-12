@@ -2,6 +2,8 @@ package attini.action.bean.config;
 
 import java.net.URI;
 import java.time.Duration;
+
+import attini.action.actions.sam.SamPackageRunnerAdapter;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,7 +26,7 @@ import attini.action.actions.runner.EcsFacade;
 import attini.action.actions.runner.RunnerHandler;
 import attini.action.configuration.InitDeployConfigurationHandler;
 import attini.action.custom.resource.CustomResourceResponseSender;
-import attini.action.facades.ArtifactStoreFacade;
+import attini.action.facades.artifactstore.ArtifactStoreFacade;
 import attini.action.facades.S3Facade;
 import attini.action.facades.deployorigin.DeployOriginFacade;
 import attini.action.facades.stackdata.DeploymentPlanDataDynamoFacade;
@@ -72,6 +74,18 @@ public class BeanConfig {
                                        .endpointOverride(getAwsServiceEndpoint("states", region))
                                        .build();
         return new StepFunctionFacade(sfnClient);
+    }
+
+    @ApplicationScoped
+    SamPackageRunnerAdapter samPackageRunnerAdapter(RunnerHandler runnerHandler,
+                                                    ArtifactStoreFacade artifactStoreFacade,
+                                                    StackDataFacade stackDataFacade,
+                                                    StackConfigurationService stackConfigurationService, StepFunctionFacade stepFunctionFacade) {
+        return new SamPackageRunnerAdapter(runnerHandler,
+                                           artifactStoreFacade,
+                                           stackDataFacade,
+                                           stackConfigurationService, stepFunctionFacade);
+
     }
 
     @ApplicationScoped
@@ -151,15 +165,15 @@ public class BeanConfig {
 
     @ApplicationScoped
     @CustomAwsClient
-    public SsmClient ssmClient(EnvironmentVariables environmentVariables){
+    public SsmClient ssmClient(EnvironmentVariables environmentVariables) {
         String region = environmentVariables.getRegion();
-        return  SsmClient.builder()
-                         .region(Region.of(region))
-                         .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
-                         .overrideConfiguration(createClientOverrideConfiguration())
-                         .httpClient(UrlConnectionHttpClient.builder().build())
-                         .endpointOverride(getAwsServiceEndpoint("ssm", region))
-                         .build();
+        return SsmClient.builder()
+                        .region(Region.of(region))
+                        .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                        .overrideConfiguration(createClientOverrideConfiguration())
+                        .httpClient(UrlConnectionHttpClient.builder().build())
+                        .endpointOverride(getAwsServiceEndpoint("ssm", region))
+                        .build();
     }
 
     @ApplicationScoped

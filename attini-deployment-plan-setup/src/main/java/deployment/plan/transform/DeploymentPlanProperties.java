@@ -6,7 +6,9 @@ import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
+import attini.domain.deserializers.CustomStringDeserializer;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
@@ -22,18 +24,22 @@ public class DeploymentPlanProperties {
     //Can be a List, Map, or String
     private final Object policies;
 
+    private final String defaultRunner;
+
     @JsonCreator
     public DeploymentPlanProperties(@JsonProperty("DeploymentPlan") DeploymentPlan deploymentPlan,
                                     @JsonProperty("RoleArn") CfnString roleArn,
                                     @JsonProperty("DefinitionSubstitutions") Map<String, Object> definitionSubstitutions,
                                     @JsonProperty("PermissionsBoundary") CfnString permissionsBoundary,
                                     @JsonProperty("Policies") CfnString policies,
-                                    @JsonProperty("PayloadDefaults") Map<String, Object> payloadDefaults) {
+                                    @JsonProperty("PayloadDefaults") Map<String, Object> payloadDefaults,
+                                    @JsonProperty("DefaultRunner")@JsonDeserialize(using = CustomStringDeserializer.class) String defaultRunner) {
 
         if (deploymentPlan == null) {
             throw new IllegalArgumentException(
                     "Attini::Deploy::DeploymentPlan resource is missing DeploymentPlan property");
         }
+        this.defaultRunner = defaultRunner;
         this.deploymentPlan = deploymentPlan;
         this.roleArn = roleArn;
         this.definitionSubstitutions = definitionSubstitutions;
@@ -70,5 +76,14 @@ public class DeploymentPlanProperties {
     @JsonProperty("PayloadDefaults")
     public Map<String, Object> getPayloadDefaults() {
         return payloadDefaults == null ? Collections.emptyMap() : payloadDefaults;
+    }
+
+    @JsonProperty("DefaultRunner")
+    public String getDefaultRunner() {
+        return  defaultRunner == null ? "AttiniDefaultRunner" : defaultRunner;
+    }
+
+    public boolean hasCustomDefaultRunner(){
+        return defaultRunner != null;
     }
 }

@@ -93,7 +93,7 @@ public class CfnHandler {
     }
 
 
-    private CfnStackConfig createCfnStackConfig(AttiniCfnInput attiniCfnInput) {
+    public CfnStackConfig createCfnStackConfig(AttiniCfnInput attiniCfnInput) {
 
         DeployOriginData deployOriginData = attiniCfnInput.deploymentOriginData();
         CfnConfig cfnConfig = attiniCfnInput.cfnConfig();

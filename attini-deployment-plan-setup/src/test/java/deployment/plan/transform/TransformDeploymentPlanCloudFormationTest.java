@@ -7,7 +7,6 @@ package deployment.plan.transform;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -53,7 +52,7 @@ class TransformDeploymentPlanCloudFormationTest {
     @BeforeEach
     void setUp() {
         when(environmentVariables.getRegion()).thenReturn("eu-west-1");
-        when(deploymentPlanStepsCreator.createDefinition(any(), anyBoolean())).thenReturn(new DeploymentPlanDefinition(
+        when(deploymentPlanStepsCreator.createDefinition(any())).thenReturn(new DeploymentPlanDefinition(
                 Collections.emptyMap(), Collections.emptyList()));
         transformDeploymentPlanCloudFormation = new TransformDeploymentPlanCloudFormation(environmentVariables,
                                                                                           ec2Client,
