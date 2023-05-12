@@ -17,8 +17,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Streams;
 
-import deployment.plan.system.EnvironmentVariables;
-
 public class DeploymentPlanStepsCreator {
 
     private static final Logger logger = Logger.getLogger(DeploymentPlanStepsCreator.class);
@@ -27,37 +25,28 @@ public class DeploymentPlanStepsCreator {
     private static final String GET_DEPLOY_DATA_KEY = "AttiniPrepareDeployment";
 
     private static final String TYPE_KEY = "Type";
-    private static final String SAM_PACKAGE_CHOICE_KEY = "AttiniSamPackage?";
-    private static final String SAM_PACKAGE_KEY = "AttiniSamPackage";
-
     private final AttiniStepLoader attiniStepLoader;
     private final DeployData deployData;
     private final ObjectMapper objectMapper;
-    private final EnvironmentVariables environmentVariables;
-
     public DeploymentPlanStepsCreator(AttiniStepLoader attiniStepLoader,
                                       DeployData deployData,
-                                      ObjectMapper objectMapper,
-                                      EnvironmentVariables environmentVariables) {
+                                      ObjectMapper objectMapper) {
         this.attiniStepLoader = requireNonNull(attiniStepLoader, "attiniStepLoader");
         this.deployData = requireNonNull(deployData, "deployData");
         this.objectMapper = requireNonNull(objectMapper, "objectMapper");
-        this.environmentVariables = requireNonNull(environmentVariables, "environmentVariables");
     }
 
-    public DeploymentPlanDefinition createDefinition(DeploymentPlan deploymentPlan, boolean shouldAddSam) {
+    public DeploymentPlanDefinition createDefinition(DeploymentPlanProperties deploymentPlanProperties) {
 
 
         ObjectNode states = objectMapper.createObjectNode();
 
-        states.setAll(getDeployDataState(deploymentPlan, shouldAddSam));
-        states.setAll((ObjectNode) objectMapper.valueToTree(deploymentPlan.getStates()));
-        // ObjectNode originalStates = objectMapper.valueToTree(deploymentPlan.getStates());
-        //  originalStates.setAll(getDeployDataState(deploymentPlan, shouldAddSam));
+        states.setAll(getDeployDataState(deploymentPlanProperties));
+        states.setAll((ObjectNode) objectMapper.valueToTree(deploymentPlanProperties.getDeploymentPlan().getStates()));
         DeploymentPlanStates deploymentPlanSteps = transformStates(states,
-                                                                   false, "DeploymentPlan");
-
-        //   states.setAll((ObjectNode) deploymentPlanSteps.states());
+                                                                   false,
+                                                                   "DeploymentPlan",
+                                                                   deploymentPlanProperties.getDefaultRunner());
 
         return new DeploymentPlanDefinition(Map.of("StartAt",
                                                    GET_DEPLOY_DATA_KEY,
@@ -66,37 +55,17 @@ public class DeploymentPlanStepsCreator {
                                             deploymentPlanSteps.attiniSteps());
     }
 
-    private ObjectNode getDeployDataState(DeploymentPlan deploymentPlan,
-                                          boolean shouldAddSam) {
+    private ObjectNode getDeployDataState(DeploymentPlanProperties deploymentPlanProperties) {
+
+        DeploymentPlan deploymentPlan = deploymentPlanProperties.getDeploymentPlan();
         ObjectNode states = objectMapper.valueToTree(deploymentPlan.getStates());
-        if (shouldAddSam) {
-            logger.info("Adding sam package to deployment plan");
-            states.set(GET_DEPLOY_DATA_KEY, deployData.getDeployData(SAM_PACKAGE_CHOICE_KEY));
-
-            Map<String, Object> runner = Map.of("Next",
-                                                deploymentPlan.getStartAt(),
-                                                "Properties",
-                                                Map.of("Runner",
-                                                       "AttiniDefaultRunner",
-                                                       "Commands",
-                                                       List.of("chmod +x attini_data/sam-package.sh",
-                                                               "./attini_data/sam-package.sh")));
-            JsonNode samPackage = attiniStepLoader.getAttiniRunner(objectMapper.valueToTree(runner),
-                                                                   SAM_PACKAGE_KEY);
-            states.set(SAM_PACKAGE_CHOICE_KEY, getSamStuffChoice(deploymentPlan.getStartAt()));
-            states.set(SAM_PACKAGE_KEY, samPackage);
-
-        } else {
-            logger.info("Not adding sam package to deployment plan");
-            states.set(GET_DEPLOY_DATA_KEY, deployData.getDeployData(deploymentPlan.getStartAt()));
-
-        }
+        states.set(GET_DEPLOY_DATA_KEY, deployData.getDeployData(deploymentPlan.getStartAt()));
         return states;
     }
 
     private DeploymentPlanStates transformStates(JsonNode originalStates,
                                                  boolean isMap,
-                                                 String stepName) {
+                                                 String stepName, String defaultRunner) {
         logger.info("Transforming states for branch");
 
         List<AttiniStep> attiniMangedSteps = new ArrayList<>();
@@ -128,37 +97,17 @@ public class DeploymentPlanStepsCreator {
 
                 }
                 case "AttiniSam" -> {
-                    JsonNode newStep = step.deepCopy();
-                    ObjectNode properties = (ObjectNode) newStep.path("Properties");
-                    JsonNode project = properties.path("Project");
-                    if (project.isMissingNode()) {
-                        throw new IllegalArgumentException("Project is missing in Sam step: " + entry.getKey());
-                    }
-                    if (project.path("Path").isMissingNode()) {
-                        throw new IllegalArgumentException("Project.Path is missing in Sam step: " + entry.getKey());
-                    }
 
-                    if (!properties.path("Region").isMissingNode() && !environmentVariables.getRegion()
-                                                                                           .equals(properties.path(
-                                                                                                                     "Region")
-                                                                                                             .asText())) {
-                        throw new IllegalArgumentException(
-                                "Cross region deployment is not supported for AttiniSam steps. Step: " + entry.getKey());
+                    Map<AttiniStep, JsonNode> attiniSamSteps = attiniStepLoader.getAttiniSam(step,
+                                                                                             entry.getKey(),
+                                                                                             nextReplacements,
+                                                                                             defaultRunner);
+                    attiniMangedSteps.addAll(attiniSamSteps.keySet());
+                    states.setAll(attiniSamSteps.entrySet()
+                                                .stream()
+                                                .collect(Collectors.toMap(t -> t.getKey().name(),
+                                                                          Map.Entry::getValue)));
 
-                    }
-
-                    if (!project.path("Path").isTextual()) {
-                        throw new IllegalArgumentException("Project.Path in AttiniSam step should be a string, step: " + entry.getKey());
-                    }
-
-                    String rawPath = project.path("Path").textValue();
-                    String path = rawPath.startsWith("/") ? rawPath : "/" + rawPath;
-                    properties.put("Template",
-                                   "../.sam-source" + path + "/template.yaml");
-                    properties.remove("Project");
-                    attiniMangedSteps.add(new AttiniStep(entry.getKey(), "AttiniSam"));
-
-                    states.set(entry.getKey(), attiniStepLoader.getAttiniCfn(newStep, entry.getKey()));
                 }
                 case "AttiniMergeOutput" -> {
                     attiniMangedSteps.add(new AttiniStep(entry.getKey(), "AttiniMergeOutput"));
@@ -169,7 +118,8 @@ public class DeploymentPlanStepsCreator {
                                                 .map(branch -> {
                                                     DeploymentPlanStates states1 = transformStates(branch.get("States"),
                                                                                                    false,
-                                                                                                   entry.getKey());
+                                                                                                   entry.getKey(),
+                                                                                                   defaultRunner);
                                                     attiniMangedSteps.addAll(states1.attiniSteps());
                                                     ObjectNode value = branch.deepCopy();
                                                     value.set("States", states1.states());
@@ -190,7 +140,7 @@ public class DeploymentPlanStepsCreator {
                     ObjectNode iterator = getIterator(step, stepName);
                     DeploymentPlanStates deploymentPlanStates = transformStates(iterator.get("States"),
                                                                                 true,
-                                                                                entry.getKey());
+                                                                                entry.getKey(), defaultRunner);
                     iterator.set("States", deploymentPlanStates.states());
                     newStep.set("Iterator", iterator);
                     states.set(entry.getKey(), newStep);
@@ -200,7 +150,7 @@ public class DeploymentPlanStepsCreator {
                     ObjectNode iterator = getIterator(step, stepName);
                     DeploymentPlanStates deploymentPlanStates = transformStates(iterator.get("States"),
                                                                                 true,
-                                                                                entry.getKey());
+                                                                                entry.getKey(), defaultRunner);
                     ObjectNode newStep = step.deepCopy();
                     iterator.set("States", deploymentPlanStates.states());
                     newStep.set("Iterator", iterator);
@@ -215,12 +165,13 @@ public class DeploymentPlanStepsCreator {
                 case "AttiniRunnerJob" -> {
                     attiniMangedSteps.add(new AttiniStep(entry.getKey(), "AttiniRunnerJob"));
                     states.set(entry.getKey(),
-                               attiniStepLoader.getAttiniRunner(step, entry.getKey()));
+                               attiniStepLoader.getAttiniRunner(step, entry.getKey(), defaultRunner));
                 }
                 case "AttiniCdk" -> {
                     Map<AttiniStep, JsonNode> attiniCdkSteps = attiniStepLoader.getAttiniCdk(step,
                                                                                              entry.getKey(),
-                                                                                             nextReplacements);
+                                                                                             nextReplacements,
+                                                                                             defaultRunner);
                     attiniMangedSteps.addAll(attiniCdkSteps.keySet());
                     states.setAll(attiniCdkSteps.entrySet()
                                                 .stream()
@@ -294,18 +245,5 @@ public class DeploymentPlanStepsCreator {
         }
 
         return (ArrayNode) branches;
-    }
-
-    private JsonNode getSamStuffChoice(String defaultNext) {
-        return objectMapper.valueToTree(Map.of("Type",
-                                               "Choice",
-                                               "Choices",
-                                               List.of(Map.of("Variable",
-                                                              "$.deploymentOriginData.samPackaged",
-                                                              "BooleanEquals",
-                                                              false,
-                                                              "Next",
-                                                              SAM_PACKAGE_KEY)),
-                                               "Default", defaultNext));
     }
 }

@@ -6,6 +6,9 @@ import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+
+import attini.action.actions.sam.SamPackageRunnerAdapter;
+import attini.action.actions.sam.input.SamInput;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 
@@ -29,7 +32,7 @@ import attini.action.actions.runner.input.RunnerInput;
 import attini.action.configuration.InitDeployConfigurationHandler;
 import attini.action.domain.DeploymentPlanExecutionMetadata;
 import attini.action.domain.DeploymentPlanStateData;
-import attini.action.facades.ArtifactStoreFacade;
+import attini.action.facades.artifactstore.ArtifactStoreFacade;
 import attini.action.facades.deployorigin.DeployOriginFacade;
 import attini.action.facades.stackdata.DeploymentPlanDataFacade;
 import attini.action.facades.stackdata.StackDataFacade;
@@ -59,6 +62,7 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
 
     private final DeploymentPlanDataFacade deploymentPlanDataFacade;
     private final CdkRunnerAdapter cdkRunnerAdapter;
+    private final SamPackageRunnerAdapter samPackageRunnerAdapter;
 
     @Inject
     public App(CfnHandler cfnHandler,
@@ -74,7 +78,7 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
                ImportHandler importHandler,
                StackDataFacade stackDataFacade,
                DeploymentPlanDataFacade deploymentPlanDataFacade,
-               CdkRunnerAdapter cdkRunnerAdapter) {
+               CdkRunnerAdapter cdkRunnerAdapter, SamPackageRunnerAdapter samPackageRunnerAdapter) {
         this.cfnHandler = requireNonNull(cfnHandler, "deployCfnStackService");
         this.stepFunctionFacade = requireNonNull(stepFunctionFacade, "stepFunctionFacade");
         this.getDeployOriginDataHandler = requireNonNull(getDeployOriginDataHandler, "getDeployOriginDataHandler");
@@ -90,6 +94,7 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
         this.stackDataFacade = requireNonNull(stackDataFacade, "stackDataFacade");
         this.deploymentPlanDataFacade = requireNonNull(deploymentPlanDataFacade, "deploymentPlanDataFacade");
         this.cdkRunnerAdapter = requireNonNull(cdkRunnerAdapter, "cdkRunnerAdapter");
+        this.samPackageRunnerAdapter = requireNonNull(samPackageRunnerAdapter, "samPackageRunnerAdapter");
     }
 
     @SuppressWarnings("unchecked")
@@ -185,6 +190,10 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
                 stackDataFacade.saveManualApprovalData(deploymentPlanExecutionMetadata, deploymentOriginData);
 
             }
+
+            case "PackageSam" -> samPackageRunnerAdapter
+                    .handle(toInput(input, SamInput.class),
+                            cfnHandler.createCfnStackConfig(toInput(input, AttiniCfnInput.class)));
             default -> logger.error("No Action was executed");
         }
         return input;

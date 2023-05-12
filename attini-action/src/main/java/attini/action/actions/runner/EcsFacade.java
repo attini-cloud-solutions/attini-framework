@@ -101,7 +101,7 @@ public class EcsFacade {
                             .build();
 
             RunTaskResponse runTaskResponse =
-                    ecsClient.runTask(createGetTaskRequest(runnerData,
+                    ecsClient.runTask(createRunTaskRequest(runnerData,
                                                            sfnToken,
                                                            runnerConfig,
                                                            networkConfiguration));
@@ -122,7 +122,7 @@ public class EcsFacade {
         }
     }
 
-    private RunTaskRequest createGetTaskRequest(RunnerData runnerData,
+    private RunTaskRequest createRunTaskRequest(RunnerData runnerData,
                                                 String sfnToken,
                                                 TaskConfiguration runnerConfig,
                                                 NetworkConfiguration networkConfiguration) {
@@ -188,7 +188,8 @@ public class EcsFacade {
                                       toEnvVariable("ATTINI_DISABLE_ANSI_COLOR",
                                                     "true"),
                                       toEnvVariable("ATTINI_AWS_ACCOUNT", environmentVariables.getAccountId()),
-                                      toEnvVariable("ATTINI_AWS_REGION", environmentVariables.getRegion())));
+                                      toEnvVariable("ATTINI_AWS_REGION", environmentVariables.getRegion()),
+                                      toEnvVariable("ATTINI_ARTIFACT_STORE", environmentVariables.getAttiniArtifactBucket())));
 
 
         taskConfig.getInstallationCommandsTimeout()

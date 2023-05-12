@@ -19,16 +19,22 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import deployment.plan.system.EnvironmentVariables;
+
 public class AttiniStepLoader {
 
     private static final Logger logger = Logger.getLogger(AttiniStepLoader.class);
     private final TemplateFileLoader templateFileLoader;
     private final ObjectMapper objectMapper;
+    private final EnvironmentVariables environmentVariables;
 
 
-    public AttiniStepLoader(TemplateFileLoader templateFileLoader, ObjectMapper objectMapper) {
+    public AttiniStepLoader(TemplateFileLoader templateFileLoader,
+                            ObjectMapper objectMapper,
+                            EnvironmentVariables environmentVariables) {
         this.templateFileLoader = requireNonNull(templateFileLoader, "templateFileLoader");
         this.objectMapper = requireNonNull(objectMapper, "objectMapper");
+        this.environmentVariables = requireNonNull(environmentVariables, "environmentVariables");
     }
 
     public JsonNode getAttiniMapCfn(JsonNode originalStep, String stepName) {
@@ -47,14 +53,68 @@ public class AttiniStepLoader {
 
     }
 
-    public JsonNode getAttiniRunner(JsonNode originalStep, String stepName) {
-        return getAttiniRunnerStep(originalStep, templateFileLoader.getAttiniRunnerTemplate(), stepName);
+    public JsonNode getAttiniRunner(JsonNode originalStep, String stepName, String defaultRunner) {
+        return getAttiniRunnerStep(originalStep, templateFileLoader.getAttiniRunnerTemplate(), stepName, defaultRunner);
+
+    }
+
+    public Map<AttiniStep, JsonNode> getAttiniSam(JsonNode originalStep,
+                                                  String stepName,
+                                                  Map<String, String> nextReplacements,
+                                                  String defaultRunner) {
+
+        String packageStepName = stepName + "PackageSam";
+
+        nextReplacements.put(stepName, packageStepName);
+        String tempKey = DigestUtils.md5Hex(stepName);
+        nextReplacements.put(tempKey, stepName);
+
+        JsonNode newStep = originalStep.deepCopy();
+
+        ObjectNode properties = (ObjectNode) newStep.path("Properties");
+        JsonNode project = properties.path("Project");
+        if (project.isMissingNode()) {
+            throw new IllegalArgumentException("Project is missing in Sam step: " + stepName);
+        }
+        if (project.path("Path").isMissingNode()) {
+            throw new IllegalArgumentException("Project.Path is missing in Sam step: " + stepName);
+        }
+
+        if (!properties.path("Region").isMissingNode() && !environmentVariables.getRegion()
+                                                                               .equals(properties.path(
+                                                                                                         "Region")
+                                                                                                 .asText())) {
+            throw new IllegalArgumentException(
+                    "Cross region deployment is not supported for AttiniSam steps. Step: " + stepName);
+
+        }
+
+        if (!project.path("Path").isTextual()) {
+            throw new IllegalArgumentException("Project.Path in AttiniSam step should be a string, step: " + stepName);
+        }
+
+        Map<AttiniStep, JsonNode> result = new HashMap<>();
+
+        ObjectNode packageSamStep = (ObjectNode) getAttiniRunnerStep(newStep,
+                                                      templateFileLoader.getAttiniSamTemplate(),
+                                                      packageStepName,
+                                                      defaultRunner);
+
+        packageSamStep.remove("End");
+
+        result.put(new AttiniStep(packageStepName, "AttiniPackageSam"), packageSamStep.put("Next", tempKey));
+
+        properties.put("Template.$",
+                       "$.output."+packageStepName+".result");
+        result.put(new AttiniStep(stepName, "AttiniCfn"), getAttiniCfn(newStep, stepName));
+
+        return result;
 
     }
 
     public Map<AttiniStep, JsonNode> getAttiniCdk(JsonNode originalStep,
                                                   String stepName,
-                                                  Map<String, String> nextReplacements) {
+                                                  Map<String, String> nextReplacements, String defaultRunner) {
         JsonNode path = originalStep.path("Properties").path("Path");
         if (path.isMissingNode() || path.asText().isBlank()) {
             ObjectNode properties = (ObjectNode) originalStep.get("Properties");
@@ -67,18 +127,18 @@ public class AttiniStepLoader {
 
         JsonNode diffNode = originalStep.path("Properties").path("Diff");
 
-        if ( !diffNode.isMissingNode() && diffNode.isValueNode()){
+        if (!diffNode.isMissingNode() && diffNode.isValueNode()) {
             throw new IllegalArgumentException("\"Diff\" in the AttiniCdk step should be an object.");
 
         }
         JsonNode diffEnabled = diffNode.path("Enabled");
 
-        if (!diffNode.isMissingNode() && diffEnabled.isMissingNode()){
+        if (!diffNode.isMissingNode() && diffEnabled.isMissingNode()) {
             throw new IllegalArgumentException("\"Diff.Enabled\" is required in the CDK step if \"Diff\" is specified.");
 
         }
 
-        if (!diffEnabled.isMissingNode() && !diffEnabled.isBoolean()){
+        if (!diffEnabled.isMissingNode() && !diffEnabled.isBoolean()) {
             throw new IllegalArgumentException("\"Diff.Enabled\" in the AttiniCdk step should be a boolean.");
         }
         if (diffEnabled.booleanValue()) {
@@ -96,8 +156,9 @@ public class AttiniStepLoader {
             diffStep.put("Next", choiceName);
 
             steps.put(new AttiniStep(diffStepName, "AttiniRunnerJob"), getAttiniRunnerStep(diffStep,
-                                                    templateFileLoader.getAttiniCdkChangesetTemplate(),
-                                                                                         diffStepName));
+                                                                                           templateFileLoader.getAttiniCdkChangesetTemplate(),
+                                                                                           diffStepName,
+                                                                                           defaultRunner));
 
             // add choice
             ObjectNode choice = objectMapper.createObjectNode();
@@ -105,7 +166,7 @@ public class AttiniStepLoader {
                   .set("Choices", objectMapper.createArrayNode()
                                               .add(objectMapper.createObjectNode()
                                                                .put("Variable",
-                                                                    "$.output."+diffStepName+".result")
+                                                                    "$.output." + diffStepName + ".result")
                                                                .put("StringEquals", "change-detected")
                                                                .put("Next", approvalName)));
 
@@ -118,16 +179,21 @@ public class AttiniStepLoader {
             ObjectNode manualApprovalStep = objectMapper.createObjectNode()
                                                         .put("Next", tempKey);
 
-            steps.put(new AttiniStep(approvalName, "AttiniManualApproval"), getAttiniManualApproval(manualApprovalStep, approvalName));
+            steps.put(new AttiniStep(approvalName, "AttiniManualApproval"),
+                      getAttiniManualApproval(manualApprovalStep, approvalName));
 
             //add cdk step
             steps.put(new AttiniStep(stepName, "AttiniCdk"), getAttiniRunnerStep(originalStep,
-                                                          templateFileLoader.getAttiniCdkTemplate(),
-                                                          stepName));
+                                                                                 templateFileLoader.getAttiniCdkTemplate(),
+                                                                                 stepName, defaultRunner));
             return steps;
         }
 
-        return Map.of(new AttiniStep(stepName, "AttiniCdk"), getAttiniRunnerStep(originalStep, templateFileLoader.getAttiniCdkTemplate(), stepName));
+        return Map.of(new AttiniStep(stepName, "AttiniCdk"),
+                      getAttiniRunnerStep(originalStep,
+                                          templateFileLoader.getAttiniCdkTemplate(),
+                                          stepName,
+                                          defaultRunner));
     }
 
     public JsonNode getAttiniImport(JsonNode originalStep, String stepName) {
@@ -193,9 +259,10 @@ public class AttiniStepLoader {
 
     private JsonNode getAttiniRunnerStep(JsonNode originalStep,
                                          File template,
-                                         String stepName) {
+                                         String stepName, String defaultRunner) {
         try {
 
+            JsonNode nodeCopy = originalStep.deepCopy();
 
             if (originalStep.path("Properties").isMissingNode()) {
                 throw new IllegalArgumentException("No Properties specified for step: " + stepName);
@@ -204,13 +271,12 @@ public class AttiniStepLoader {
                     .path("Properties")
                     .path("Runner")
                     .isMissingNode()) {
-                JsonNode nodeCopy = originalStep.deepCopy();
                 ObjectNode properties = (ObjectNode) nodeCopy.path("Properties");
-                properties.put("Runner", "AttiniDefaultRunner");
+                properties.put("Runner", defaultRunner);
                 return initNewStep(nodeCopy, template, stepName);
             }
 
-            return initNewStep(originalStep, template, stepName);
+            return initNewStep(nodeCopy, template, stepName);
         } catch (IOException e) {
             logger.error("could not parse Attini cfn json", e);
             throw new UncheckedIOException(e);

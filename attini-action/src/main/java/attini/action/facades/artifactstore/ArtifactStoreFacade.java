@@ -1,13 +1,15 @@
-package attini.action.facades;
+package attini.action.facades.artifactstore;
 
 import static java.util.Objects.requireNonNull;
 
+import java.io.IOException;
 import java.io.UncheckedIOException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import attini.action.facades.S3Facade;
 import attini.action.facades.stackdata.DistributionDataFacade;
 import attini.domain.DistributionId;
 import attini.domain.DistributionName;
@@ -40,9 +42,9 @@ public class ArtifactStoreFacade {
         try {
             byte[] bytes = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(jsonNode);
             s3Facade.saveObject(bucketName,
-                                createKey(environment,
-                                          distributionName,
-                                          distributionId),
+                                createOutputKey(environment,
+                                                distributionName,
+                                                distributionId),
                                 bytes);
             distributionDataFacade.updateDistributionOutput(distributionName,
                                                             environment,
@@ -54,11 +56,33 @@ public class ArtifactStoreFacade {
         }
     }
 
-    private static String createKey(Environment environment,
-                             DistributionName distributionName,
-                             DistributionId distributionId) {
+    public MetadataFile getMetadataFile(Environment environment,
+                                        DistributionName distributionName,
+                                        DistributionId distributionId) {
+
+        byte[] metadataFile = s3Facade.getObject(bucketName,
+                                                 createMetadataKey(environment, distributionName, distributionId));
+
+        try {
+            return objectMapper.readValue(metadataFile, MetadataFile.class);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+
+    }
+
+    private static String createOutputKey(Environment environment,
+                                          DistributionName distributionName,
+                                          DistributionId distributionId) {
         return "outputs/" + environment.asString() + "/" + distributionName.asString() + "/" + distributionId.asString() + "/output.json";
     }
+
+    private static String createMetadataKey(Environment environment,
+                                            DistributionName distributionName,
+                                            DistributionId distributionId) {
+        return environment.asString() + "/" + distributionName.asString() + "/" + distributionId.asString() + "/distribution-origin/attini_data/attini-metadata.json";
+    }
+
 
     public String getOutputUrl(Environment environment,
                                DistributionName distributionName,
@@ -68,7 +92,7 @@ public class ArtifactStoreFacade {
                ".s3." +
                environmentVariables.getRegion() +
                ".amazonaws.com/" +
-               createKey(environment, distributionName, distributionId);
+               createOutputKey(environment, distributionName, distributionId);
 
     }
 

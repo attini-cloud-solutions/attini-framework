@@ -84,7 +84,7 @@ public class AttiniRunners {
                                         } else {
                                             taskDefinitions.put(taskDefinitionName,
                                                                 Resources.ec2taskDefinition(CfnString.create(properties.get(
-                                                                        "Image")), roleArn, logGroupName));
+                                                                        "Image")), roleArn, logGroupName, region));
                                         }
                                         logGroups.put(logGroupName, Resources.logGroup());
                                     }
@@ -108,7 +108,7 @@ public class AttiniRunners {
                                                                                             createRoleArnRef(
                                                                                                     properties.path(
                                                                                                             "RoleArn")),
-                                                                                            logGroupName));
+                                                                                            logGroupName, region));
                                             runnerBuilder.taskDefinitionArn(createIntrinsicFunction("Ref",
                                                                                                     taskDefinitionName));
                                             logGroups.put(logGroupName, Resources.logGroup());

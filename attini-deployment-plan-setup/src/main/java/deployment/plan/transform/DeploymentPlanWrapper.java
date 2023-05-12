@@ -50,13 +50,8 @@ public class DeploymentPlanWrapper {
     public DeploymentPlanResource getDeploymentPlanResource() {
         return deploymentPlanResource;
     }
-
-    public boolean containsSamSteps() {
-        return containsSamSteps;
-    }
-
     public boolean shouldDeployDefaultRunner() {
-        return containsSamSteps || containsRunnerStepsWithoutRunner;
+        return (containsSamSteps || containsRunnerStepsWithoutRunner) && !deploymentPlanResource.getDeploymentPlanProperties().hasCustomDefaultRunner();
     }
 
     private static Stream<Map.Entry<String, JsonNode>> findSteps(JsonNode source, String type) {

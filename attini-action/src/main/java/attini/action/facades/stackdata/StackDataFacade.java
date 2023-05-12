@@ -8,11 +8,11 @@ package attini.action.facades.stackdata;
 import java.util.Optional;
 
 import attini.action.actions.deploycloudformation.SfnExecutionArn;
-import attini.domain.DeployOriginData;
-import attini.action.actions.deploycloudformation.stackconfig.StackConfiguration;
 import attini.action.actions.deploycloudformation.StackData;
+import attini.action.actions.deploycloudformation.stackconfig.StackConfiguration;
 import attini.action.actions.runner.RunnerData;
 import attini.action.domain.DeploymentPlanExecutionMetadata;
+import attini.domain.DeployOriginData;
 
 public interface StackDataFacade {
 
@@ -31,4 +31,6 @@ public interface StackDataFacade {
     Optional<SfnExecutionArn> getStacksSfnExecutionArn(StackConfiguration stackConfiguration);
 
     void saveToken(String sfnToken, StackConfiguration stackConfiguration);
+
+    Optional<StackTemplate> getStackTemplate(StackConfiguration stackConfiguration);
 }

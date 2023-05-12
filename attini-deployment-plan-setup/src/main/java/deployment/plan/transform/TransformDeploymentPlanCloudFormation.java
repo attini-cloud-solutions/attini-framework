@@ -87,6 +87,16 @@ public class TransformDeploymentPlanCloudFormation {
                                                         environmentVariables.getAccount(),
                                                         environmentVariables.getDefaultRunnerImage());
 
+        deploymentPlanWrapper.map(DeploymentPlanWrapper::getDeploymentPlanResource)
+                             .map(DeploymentPlanResource::getDeploymentPlanProperties)
+                             .ifPresent(deploymentPlanProperties -> {
+                                 if (deploymentPlanProperties.hasCustomDefaultRunner() &&
+                                     !attiniRunners.getRunnerNames()
+                                                   .contains(deploymentPlanProperties.getDefaultRunner())) {
+                                     throw new IllegalArgumentException("No runner with name " + deploymentPlanProperties.getDefaultRunner() + " exists, custom default runners should be configured in the init stack.");
+                                 }
+                             });
+
         return Stream.of(attiniRunners.getSqsQueues(),
                          attiniRunners.getSecurityGroups(),
                          attiniRunners.getLogGroups(),
@@ -107,8 +117,7 @@ public class TransformDeploymentPlanCloudFormation {
         String sfnResourceName = String.format("AttiniDeploymentPlanSfn%s",
                                                deploymentPlan.getDeploymentPlanName());
         return Map.of(sfnResourceName,
-                      createStateMachineResource(deploymentPlan.getDeploymentPlanResource(),
-                                                 deploymentPlan.containsSamSteps()),
+                      createStateMachineResource(deploymentPlan.getDeploymentPlanResource()),
                       String.format("%sTrigger", sfnResourceName),
                       createDeploymentPlanTrigger(sfnResourceName,
                                                   attiniRunners,
@@ -186,9 +195,8 @@ public class TransformDeploymentPlanCloudFormation {
 
     }
 
-    private Map<String, Object> createStateMachineResource(DeploymentPlanResource deploymentPlanData,
-                                                           boolean shouldAddSam) {
-        SfnProperties properties = getSfnProperties(deploymentPlanData.getDeploymentPlanProperties(), shouldAddSam);
+    private Map<String, Object> createStateMachineResource(DeploymentPlanResource deploymentPlanData) {
+        SfnProperties properties = getSfnProperties(deploymentPlanData.getDeploymentPlanProperties());
         HashMap<String, Object> metadata = new HashMap<>(deploymentPlanData.getMetadata());
         metadata.put("AttiniSteps", properties.attiniManagedSteps);
         return Map.of(TYPE_KEY, "AWS::Serverless::StateMachine",
@@ -196,7 +204,7 @@ public class TransformDeploymentPlanCloudFormation {
                       "Metadata", metadata);
     }
 
-    private SfnProperties getSfnProperties(DeploymentPlanProperties deploymentPlanProperties, boolean shouldAddSam) {
+    private SfnProperties getSfnProperties(DeploymentPlanProperties deploymentPlanProperties) {
         Map<String, Object> sfnProperties = new HashMap<>();
 
         if (deploymentPlanProperties.getPolicies().isEmpty() &&
@@ -211,9 +219,8 @@ public class TransformDeploymentPlanCloudFormation {
             sfnProperties.put("Role", deploymentPlanProperties.getRoleArn().get());
         }
 
-        DeploymentPlan deploymentPlan = deploymentPlanProperties.getDeploymentPlan();
-        DeploymentPlanDefinition deploymentPlanDefinition = deploymentPlanStepsCreator.createDefinition(deploymentPlan,
-                                                                                                        shouldAddSam);
+        DeploymentPlanDefinition deploymentPlanDefinition = deploymentPlanStepsCreator.createDefinition(
+                deploymentPlanProperties);
         sfnProperties.put("Definition", deploymentPlanDefinition.definition());
         sfnProperties.put("Tags", Map.of("AttiniProvider", "DeploymentPlan"));
 
