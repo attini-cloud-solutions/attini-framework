@@ -80,7 +80,8 @@ public class BeanConfig {
     SamPackageRunnerAdapter samPackageRunnerAdapter(RunnerHandler runnerHandler,
                                                     ArtifactStoreFacade artifactStoreFacade,
                                                     StackDataFacade stackDataFacade,
-                                                    StackConfigurationService stackConfigurationService, StepFunctionFacade stepFunctionFacade) {
+                                                    StackConfigurationService stackConfigurationService,
+                                                    StepFunctionFacade stepFunctionFacade) {
         return new SamPackageRunnerAdapter(runnerHandler,
                                            artifactStoreFacade,
                                            stackDataFacade,
@@ -126,10 +127,13 @@ public class BeanConfig {
 
     @ApplicationScoped
     Ec2Facade ec2Facade(EnvironmentVariables environmentVariables, @CustomAwsClient SsmClient ssmClient,
-                        ObjectMapper objectMapper) {
+                        ObjectMapper objectMapper, EcsFacade ecsFacade) {
         return new Ec2Facade(Ec2Client.builder()
                                       .httpClient(UrlConnectionHttpClient.builder().build())
-                                      .build(), environmentVariables, ssmClient, objectMapper);
+                                      .build(), environmentVariables,
+                             ssmClient,
+                             objectMapper,
+                             ecsFacade);
     }
 
     @ApplicationScoped

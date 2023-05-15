@@ -72,6 +72,11 @@ public class RunnerHandler {
             startNewTaskIfNotRunning(runnerDataWithEc2Id,
                                      runnerInput.deploymentPlanExecutionMetadata().sfnToken(),
                                      runnerInput);
+        } catch (Ec2FailedToStartException e) {
+            logger.error("EC2 instance did not start correctly", e);
+            stepFunctionFacade.sendError(runnerInput.deploymentPlanExecutionMetadata().sfnToken(),
+                                         e.getMessage(),
+                                         "Ec2StartFailedError");
 
 
         } catch (IllegalArgumentException e) {
@@ -260,7 +265,7 @@ public class RunnerHandler {
                                                        .build())
                                                .build();
                              stackDataDynamoFacade.saveRunnerData(runnerDataWithEc2Id);
-                             ec2Facade.waitForStart(instanceId);
+                             ec2Facade.waitForStart(instanceId, runnerData, ec2);
                              return runnerDataWithEc2Id;
 
 
