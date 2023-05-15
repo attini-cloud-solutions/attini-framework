@@ -63,7 +63,9 @@ public class Ec2Facade {
 
     public Ec2Facade(Ec2Client ec2Client,
                      EnvironmentVariables environmentVariables,
-                     SsmClient ssmClient, ObjectMapper objectMapper, EcsFacade ecsFacade) {
+                     SsmClient ssmClient,
+                     ObjectMapper objectMapper,
+                     EcsFacade ecsFacade) {
         this.ec2Client = requireNonNull(ec2Client, "ec2Client");
         this.environmentVariables = requireNonNull(environmentVariables, "environmentVariables");
         this.ssmClient = requireNonNull(ssmClient, "ssmClient");
@@ -217,10 +219,10 @@ public class Ec2Facade {
                                                                    .build());
 
         for (int i = 0; i < 90; i++) {
-            if(ecsFacade.isRegisterWithCluster(instanceId, runnerData)){
+            if (ecsFacade.isRegisterWithCluster(instanceId, runnerData)) {
                 logger.info("EC2 instance is running");
                 return;
-            }else {
+            } else {
                 try {
                     TimeUnit.SECONDS.sleep(2);
                 } catch (InterruptedException e) {
@@ -239,16 +241,18 @@ public class Ec2Facade {
         //describe ec2 state, om den är ok, printa ecs agent log.
 
         terminateInstance(instanceId);
-        throw new Ec2FailedToStartException("The EC2 instance did not register in the ECS cluster within the expected time. EC2 Instance status: "+ instanceStatus.instanceStatus().status()+", ECS client log group: " + createEcsLogUrl(ec2.getEc2Config().ecsClientLogGroup())+". Terminating the EC2 instance.");
-
+        throw new Ec2FailedToStartException(
+                "The EC2 instance did not register in the ECS cluster within the expected time. EC2 Instance status: " + instanceStatus.instanceStatus()
+                                                                                                                                       .status() + ", ECS client log group: " + createEcsLogUrl(
+                        ec2.getEc2Config().ecsClientLogGroup()) + ". Terminating the EC2 instance.");
 
 
     }
 
-    private String createEcsLogUrl(String logGroup){
+    private String createEcsLogUrl(String logGroup) {
         String region = environmentVariables.getRegion();
         String logUrl = "https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#logsV2:log-groups/log-group/%s";
-        return String.format(logUrl,region , region, encode(logGroup));
+        return String.format(logUrl, region, region, encode(logGroup));
 
     }
 
