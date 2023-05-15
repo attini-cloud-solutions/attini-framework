@@ -12,13 +12,17 @@ import attini.action.system.EnvironmentVariables;
 import software.amazon.awssdk.services.ecs.EcsClient;
 import software.amazon.awssdk.services.ecs.model.AwsVpcConfiguration;
 import software.amazon.awssdk.services.ecs.model.ContainerDefinition;
+import software.amazon.awssdk.services.ecs.model.ContainerInstance;
+import software.amazon.awssdk.services.ecs.model.ContainerInstanceStatus;
 import software.amazon.awssdk.services.ecs.model.ContainerOverride;
+import software.amazon.awssdk.services.ecs.model.DescribeContainerInstancesRequest;
 import software.amazon.awssdk.services.ecs.model.DescribeTaskDefinitionRequest;
 import software.amazon.awssdk.services.ecs.model.DescribeTasksRequest;
 import software.amazon.awssdk.services.ecs.model.EcsException;
 import software.amazon.awssdk.services.ecs.model.InvalidParameterException;
 import software.amazon.awssdk.services.ecs.model.KeyValuePair;
 import software.amazon.awssdk.services.ecs.model.LaunchType;
+import software.amazon.awssdk.services.ecs.model.ListContainerInstancesRequest;
 import software.amazon.awssdk.services.ecs.model.NetworkConfiguration;
 import software.amazon.awssdk.services.ecs.model.PlacementConstraint;
 import software.amazon.awssdk.services.ecs.model.PlacementConstraintType;
@@ -33,9 +37,9 @@ public class EcsFacade {
 
     private static final Logger logger = Logger.getLogger(EcsFacade.class);
 
-    private static final String RUNNER_VERSION = "2.0.0";
+    private static final String RUNNER_VERSION = "2.0.1";
 
-    private static final String RUNNER_REQUIRED_VERSION = "2.0.0";
+    private static final String RUNNER_REQUIRED_VERSION = "2.0.1";
 
     private final EcsClient ecsClient;
     private final EnvironmentVariables environmentVariables;
@@ -80,6 +84,33 @@ public class EcsFacade {
 
     public void waitUntilStopped(String taskId, String cluster) {
         ecsClient.waiter().waitUntilTasksStopped(DescribeTasksRequest.builder().cluster(cluster).tasks(taskId).build());
+    }
+
+    public boolean isRegisterWithCluster(String instanceId, RunnerData runnerData) {
+
+        List<String> containerInstances = ecsClient.listContainerInstances(
+                                                           ListContainerInstancesRequest.builder()
+                                                                                        .status(ContainerInstanceStatus.ACTIVE)
+                                                                                        .filter("ec2InstanceId == " + instanceId)
+                                                                                        .cluster(
+                                                                                                runnerData.getTaskConfiguration()
+                                                                                                          .cluster())
+                                                                                        .build())
+                                                   .containerInstanceArns();
+        if (containerInstances.isEmpty()) {
+            return false;
+        }
+        return ecsClient
+                .describeContainerInstances(DescribeContainerInstancesRequest.builder()
+                                                                             .containerInstances(containerInstances)
+                                                                             .cluster(runnerData.getTaskConfiguration()
+                                                                                                .cluster())
+                                                                             .build())
+                .containerInstances()
+                .stream()
+                .filter(ContainerInstance::agentConnected)
+                .anyMatch(containerInstance -> instanceId.equals(containerInstance.ec2InstanceId()));
+
     }
 
     public String startTask(RunnerData runnerData,
@@ -189,7 +220,8 @@ public class EcsFacade {
                                                     "true"),
                                       toEnvVariable("ATTINI_AWS_ACCOUNT", environmentVariables.getAccountId()),
                                       toEnvVariable("ATTINI_AWS_REGION", environmentVariables.getRegion()),
-                                      toEnvVariable("ATTINI_ARTIFACT_STORE", environmentVariables.getAttiniArtifactBucket())));
+                                      toEnvVariable("ATTINI_ARTIFACT_STORE",
+                                                    environmentVariables.getAttiniArtifactBucket())));
 
 
         taskConfig.getInstallationCommandsTimeout()

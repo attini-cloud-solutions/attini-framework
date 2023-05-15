@@ -3,13 +3,14 @@ package attini.action.actions.runner;
 import static java.util.Objects.requireNonNull;
 
 import java.io.UncheckedIOException;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.jboss.logging.Logger;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -43,6 +44,7 @@ public class Ec2Facade {
     private final EnvironmentVariables environmentVariables;
     private final SsmClient ssmClient;
     private final ObjectMapper objectMapper;
+    private final EcsFacade ecsFacade;
 
     private final static Map<String, String> imageIdMap = Map.of("AmazonLinux2",
                                                                  "/aws/service/ecs/optimized-ami/amazon-linux-2/kernel-5.10/recommended",
@@ -61,11 +63,12 @@ public class Ec2Facade {
 
     public Ec2Facade(Ec2Client ec2Client,
                      EnvironmentVariables environmentVariables,
-                     SsmClient ssmClient, ObjectMapper objectMapper) {
+                     SsmClient ssmClient, ObjectMapper objectMapper, EcsFacade ecsFacade) {
         this.ec2Client = requireNonNull(ec2Client, "ec2Client");
         this.environmentVariables = requireNonNull(environmentVariables, "environmentVariables");
         this.ssmClient = requireNonNull(ssmClient, "ssmClient");
         this.objectMapper = requireNonNull(objectMapper, "objectMapper");
+        this.ecsFacade = requireNonNull(ecsFacade, "ecsFacade");
     }
 
     public String startInstance(Ec2 ec2, RunnerData runnerData) {
@@ -123,15 +126,18 @@ public class Ec2Facade {
                                                                                            .build(),
                                                                                         Tag.builder()
                                                                                            .key("AttiniDistributionName")
-                                                                                           .value(runnerData.getDistributionName().asString())
+                                                                                           .value(runnerData.getDistributionName()
+                                                                                                            .asString())
                                                                                            .build(),
                                                                                         Tag.builder()
                                                                                            .key("AttiniEnvironment")
-                                                                                           .value(runnerData.getEnvironment().asString())
+                                                                                           .value(runnerData.getEnvironment()
+                                                                                                            .asString())
                                                                                            .build(),
                                                                                         Tag.builder()
                                                                                            .key("EcsCluster")
-                                                                                           .value(runnerData.getTaskConfiguration().cluster())
+                                                                                           .value(runnerData.getTaskConfiguration()
+                                                                                                            .cluster())
                                                                                            .build())
                                                                                   .build())
                                                           .iamInstanceProfile(
@@ -168,7 +174,7 @@ public class Ec2Facade {
                                                " specify a valid imageId, starting with \"ami-\". Current value: " + ami);
         }
 
-        if (ssmKey == null){
+        if (ssmKey == null) {
             return ami;
         }
 
@@ -204,14 +210,50 @@ public class Ec2Facade {
         }
     }
 
-    public void waitForStart(String instanceId) {
+    public void waitForStart(String instanceId, RunnerData runnerData, Ec2 ec2) {
         ec2Client.waiter()
-                 .waitUntilInstanceStatusOk(DescribeInstanceStatusRequest.builder()
-                                                                         .instanceIds(instanceId)
-                                                                         .build());
+                 .waitUntilInstanceRunning(DescribeInstancesRequest.builder()
+                                                                   .instanceIds(instanceId)
+                                                                   .build());
+
+        for (int i = 0; i < 90; i++) {
+            if(ecsFacade.isRegisterWithCluster(instanceId, runnerData)){
+                logger.info("EC2 instance is running");
+                return;
+            }else {
+                try {
+                    TimeUnit.SECONDS.sleep(2);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
+        InstanceStatus instanceStatus = ec2Client.describeInstanceStatus(DescribeInstanceStatusRequest.builder()
+                                                                                                      .instanceIds(
+                                                                                                              instanceId)
+                                                                                                      .build())
+                                                 .instanceStatuses()
+                                                 .get(0);
+
+        //describe ec2 state, om den är ok, printa ecs agent log.
+
+        terminateInstance(instanceId);
+        throw new Ec2FailedToStartException("The EC2 instance did not register in the ECS cluster within the expected time. EC2 Instance status: "+ instanceStatus.instanceStatus().status()+", ECS client log group: " + createEcsLogUrl(ec2.getEc2Config().ecsClientLogGroup())+". Terminating the EC2 instance.");
 
 
-        logger.info("EC2 instance is running");
+
+    }
+
+    private String createEcsLogUrl(String logGroup){
+        String region = environmentVariables.getRegion();
+        String logUrl = "https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#logsV2:log-groups/log-group/%s";
+        return String.format(logUrl,region , region, encode(logGroup));
+
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(URLEncoder.encode(value, StandardCharsets.UTF_8), StandardCharsets.UTF_8);
     }
 
     public void waitForStop(String instanceId) {
