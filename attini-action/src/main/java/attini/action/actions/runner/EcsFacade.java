@@ -88,6 +88,8 @@ public class EcsFacade {
 
     public boolean isRegisterWithCluster(String instanceId, RunnerData runnerData) {
 
+        logger.info("Checking if instance is registered");
+
         List<String> containerInstances = ecsClient.listContainerInstances(
                                                            ListContainerInstancesRequest.builder()
                                                                                         .status(ContainerInstanceStatus.ACTIVE)

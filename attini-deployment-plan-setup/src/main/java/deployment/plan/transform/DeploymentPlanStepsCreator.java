@@ -46,10 +46,11 @@ public class DeploymentPlanStepsCreator {
         DeploymentPlanStates deploymentPlanSteps = transformStates(states,
                                                                    false,
                                                                    "DeploymentPlan",
-                                                                   deploymentPlanProperties.getDefaultRunner());
+                                                                   deploymentPlanProperties.getDefaultRunner(),
+                                                                   GET_DEPLOY_DATA_KEY);
 
         return new DeploymentPlanDefinition(Map.of("StartAt",
-                                                   GET_DEPLOY_DATA_KEY,
+                                                   deploymentPlanSteps.startAt(),
                                                    "States",
                                                    deploymentPlanSteps.states()),
                                             deploymentPlanSteps.attiniSteps());
@@ -65,7 +66,9 @@ public class DeploymentPlanStepsCreator {
 
     private DeploymentPlanStates transformStates(JsonNode originalStates,
                                                  boolean isMap,
-                                                 String stepName, String defaultRunner) {
+                                                 String stepName,
+                                                 String defaultRunner,
+                                                 String startAt) {
         logger.info("Transforming states for branch");
 
         List<AttiniStep> attiniMangedSteps = new ArrayList<>();
@@ -119,9 +122,11 @@ public class DeploymentPlanStepsCreator {
                                                     DeploymentPlanStates states1 = transformStates(branch.get("States"),
                                                                                                    false,
                                                                                                    entry.getKey(),
-                                                                                                   defaultRunner);
+                                                                                                   defaultRunner, branch.get("StartAt")
+                                                                                                                        .asText());
                                                     attiniMangedSteps.addAll(states1.attiniSteps());
                                                     ObjectNode value = branch.deepCopy();
+                                                    value.put("StartAt", states1.startAt());
                                                     value.set("States", states1.states());
                                                     return value;
                                                 }).collect(Collector.of(objectMapper::createArrayNode,
@@ -140,7 +145,8 @@ public class DeploymentPlanStepsCreator {
                     ObjectNode iterator = getIterator(step, stepName);
                     DeploymentPlanStates deploymentPlanStates = transformStates(iterator.get("States"),
                                                                                 true,
-                                                                                entry.getKey(), defaultRunner);
+                                                                                entry.getKey(), defaultRunner,
+                                                                                iterator.get("StartAt").asText());
                     iterator.set("States", deploymentPlanStates.states());
                     newStep.set("Iterator", iterator);
                     states.set(entry.getKey(), newStep);
@@ -150,7 +156,9 @@ public class DeploymentPlanStepsCreator {
                     ObjectNode iterator = getIterator(step, stepName);
                     DeploymentPlanStates deploymentPlanStates = transformStates(iterator.get("States"),
                                                                                 true,
-                                                                                entry.getKey(), defaultRunner);
+                                                                                entry.getKey(),
+                                                                                defaultRunner,
+                                                                                iterator.get("StartAt").asText());
                     ObjectNode newStep = step.deepCopy();
                     iterator.set("States", deploymentPlanStates.states());
                     newStep.set("Iterator", iterator);
@@ -204,8 +212,12 @@ public class DeploymentPlanStepsCreator {
                       objectNode.put("Default", nextReplacements.get(entry.getValue().path("Default").asText()));
                   }
               });
-        return new DeploymentPlanStates(attiniMangedSteps, states);
 
+        if (nextReplacements.containsKey(startAt)){
+            logger.info("Replacing startAt for branch, new value: " + nextReplacements.get(startAt));
+            return new DeploymentPlanStates(attiniMangedSteps, states,nextReplacements.get(startAt));
+        }
+        return new DeploymentPlanStates(attiniMangedSteps, states,startAt);
     }
 
     private ObjectNode getAttiniMapParameters() {
