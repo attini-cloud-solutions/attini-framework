@@ -19,9 +19,9 @@ build-native:
 deploy:
 	@sam deploy --resolve-s3 --s3-prefix $(APP_NAME) --stack-name $(APP_NAME) --region $(AWS_REGION) --no-confirm-changeset --capabilities CAPABILITY_NAMED_IAM \
 			--parameter-overrides 	  AcceptLicenseAgreement=true \
-																CreateDeploymentPlanDefaultRole=true \
-																CreateInitDeployDefaultRole=true \
-																GiveAdminAccess=true \
+																CreateDeploymentPlanDefaultRole=false \
+																CreateInitDeployDefaultRole=false \
+																GiveAdminAccess=false \
 																EnvironmentParameterName=$(ENVIRONMENT_PARAMETER_NAME)
 
 build-and-deploy: build-native deploy

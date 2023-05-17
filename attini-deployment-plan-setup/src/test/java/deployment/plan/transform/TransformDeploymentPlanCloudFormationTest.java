@@ -16,7 +16,6 @@ import java.util.Collections;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,7 +29,6 @@ import jakarta.inject.Inject;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 
 @QuarkusTest
-@Disabled("Stopped working with Quarkus 3.0.1. There is a merged PR that should fix the issue, so enable again in next patch version")
 class TransformDeploymentPlanCloudFormationTest {
 
 

@@ -14,6 +14,8 @@ import attini.action.actions.deploycloudformation.SfnExecutionArn;
 import attini.action.actions.runner.input.RunnerInput;
 import attini.action.facades.stackdata.StackDataDynamoFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
+import attini.domain.polling.Poller;
+import attini.domain.polling.PollingResult;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
@@ -198,30 +200,39 @@ public class RunnerHandler {
 
     private void waitForRunnerStart(String taskId, String cluster, RunnerInput runnerInput) {
         logger.info("Waiting for runner to start");
-        for (int i = 0; i < 300; i++) {
-            waitFor(2);
-            RunnerData runnerData1 = stackDataDynamoFacade.getRunnerData(runnerInput.deployOriginData().getStackName(),
-                                                                         runnerInput.properties().runner());
+        Poller.builder(() -> {
+                  RunnerData runnerData1 = stackDataDynamoFacade.getRunnerData(runnerInput.deployOriginData().getStackName(),
+                                                                               runnerInput.properties().runner());
 
 
-            if (!runnerData1.getTaskId().map(s -> s.equals(taskId)).orElse(false)) {
-                logger.error("TaskId changed in states table. Will stop task");
-                ecsFacade.stopTask(taskId, cluster);
-                return;
-            }
+                  if (!runnerData1.getTaskId().map(s -> s.equals(taskId)).orElse(false)) {
+                      logger.error("TaskId changed in states table. Will stop task");
+                      ecsFacade.stopTask(taskId, cluster);
+                      return new PollingResult<>(true);
+                  }
 
-            if (runnerData1.isStarted()) {
-                logger.info("Task started");
-                return;
-            }
+                  if (runnerData1.isStarted()) {
+                      logger.info("Task started");
+                      return new PollingResult<>(true);
+                  }
 
-            TaskStatus taskStatus = ecsFacade.getTaskStatus(taskId, cluster);
-            if (taskStatus.isStoppingOrStopped()) {
-                throw new TaskStartFailedException(taskStatus);
-            }
-        }
+                  TaskStatus taskStatus = ecsFacade.getTaskStatus(taskId, cluster);
+                  if (taskStatus.isStoppingOrStopped()) {
+                      throw new TaskStartFailedException(taskStatus);
+                  }
 
-        ecsFacade.stopTask(taskId, cluster);
+                  return new PollingResult<>(false);
+              }).setCalls(300)
+              .setInterval(2, TimeUnit.SECONDS)
+                .setTimeoutExceptionSupplier(() -> {
+                    ecsFacade.stopTask(taskId, cluster);
+                    return new IllegalStateException("Task did not start within the expected time frame");
+                })
+              .build()
+              .poll();
+
+
+
 
 
     }

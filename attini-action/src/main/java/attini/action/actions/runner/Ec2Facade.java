@@ -15,6 +15,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import attini.action.system.EnvironmentVariables;
+import attini.domain.polling.Poller;
+import attini.domain.polling.PollingResult;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.BlockDeviceMapping;
 import software.amazon.awssdk.services.ec2.model.DescribeImagesRequest;
@@ -218,35 +220,29 @@ public class Ec2Facade {
                                                                    .instanceIds(instanceId)
                                                                    .build());
 
-        for (int i = 0; i < 90; i++) {
-            if (ecsFacade.isRegisterWithCluster(instanceId, runnerData)) {
-                logger.info("EC2 instance is running");
-                return;
-            } else {
-                try {
-                    TimeUnit.SECONDS.sleep(2);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        }
+        Poller.builder(() -> new PollingResult<>(ecsFacade.isRegisterWithCluster(instanceId, runnerData), null))
+              .setCalls(90)
+              .setInterval(2, TimeUnit.SECONDS)
+              .setTimeoutExceptionSupplier(() -> {
+                  InstanceStatus instanceStatus = getInstanceStatus(instanceId);
+                  terminateInstance(instanceId);
+                  return new Ec2FailedToStartException(
+                          "The EC2 instance did not register in the ECS cluster within the expected time. EC2 Instance status: " + instanceStatus.instanceStatus()
+                                                                                                                                                 .status() + ", ECS client log group: " + createEcsLogUrl(
+                                  ec2.getEc2Config().ecsClientLogGroup()) + ". Terminating the EC2 instance.");
+              })
+              .build()
+              .poll();
 
-        InstanceStatus instanceStatus = ec2Client.describeInstanceStatus(DescribeInstanceStatusRequest.builder()
-                                                                                                      .instanceIds(
-                                                                                                              instanceId)
-                                                                                                      .build())
-                                                 .instanceStatuses()
-                                                 .get(0);
+    }
 
-        //describe ec2 state, om den är ok, printa ecs agent log.
-
-        terminateInstance(instanceId);
-        throw new Ec2FailedToStartException(
-                "The EC2 instance did not register in the ECS cluster within the expected time. EC2 Instance status: " + instanceStatus.instanceStatus()
-                                                                                                                                       .status() + ", ECS client log group: " + createEcsLogUrl(
-                        ec2.getEc2Config().ecsClientLogGroup()) + ". Terminating the EC2 instance.");
-
-
+    private InstanceStatus getInstanceStatus(String instanceId) {
+        return ec2Client.describeInstanceStatus(DescribeInstanceStatusRequest.builder()
+                                                                             .instanceIds(
+                                                                                     instanceId)
+                                                                             .build())
+                        .instanceStatuses()
+                        .get(0);
     }
 
     private String createEcsLogUrl(String logGroup) {
