@@ -132,6 +132,9 @@ public class DeployCfnCrossRegionService {
     }
 
     private static boolean isSameExecution(StackData stackData, String clientRequestToken) {
+        if(clientRequestToken == null){
+            return false;
+        }
         return clientRequestToken.startsWith(stackData.getDeploymentPlanExecutionMetadata()
                                                       .executionArn()
                                                       .extractExecutionId());

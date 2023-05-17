@@ -235,7 +235,7 @@ public class StackConfigurationService {
         outputPath.map(stringSubstitutor::replace).ifPresent(builder::setOutputPath);
 
         StackConfiguration stackConfiguration = builder.build();
-        logger.info("Final stack config =" + stackConfiguration);
+        logger.info("Final stack config:" + stackConfiguration);
         return stackConfiguration;
 
     }
