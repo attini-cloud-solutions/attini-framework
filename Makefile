@@ -6,12 +6,12 @@ APP_NAME   						 	=attini-setup
 
 
 build:
-	@./mvnw clean package -Dquarkus.native.container-build="$(DOCKER_BUILD)" -Dquarkus.native.builder-image=$(QUARKUS_BUILD_IMAGE); \
+	@./mvnw clean package -q -B -Dquarkus.native.container-build="$(DOCKER_BUILD)" -Dquarkus.native.builder-image=$(QUARKUS_BUILD_IMAGE); \
 	cd attini-deployment-plan-setup/target/classes/templates; \
 	zip -yr --symlinks ../../function.zip .;
 
 build-native:
-	@./mvnw clean package -Pnative -Dquarkus.native.container-build="$(DOCKER_BUILD)" -Dquarkus.native.builder-image="$(QUARKUS_BUILD_IMAGE)"; \
+	@./mvnw clean package -q -B -Pnative -Dquarkus.native.container-build="$(DOCKER_BUILD)" -Dquarkus.native.builder-image="$(QUARKUS_BUILD_IMAGE)"; \
 	cd attini-deployment-plan-setup/target/classes/templates; \
 	zip -yr --symlinks ../../function.zip .;
 
