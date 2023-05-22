@@ -1576,6 +1576,8 @@ Resources:
                   - !Sub https://attini-artifacts-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/attini-setup/*
                   - !Sub https://s3.amazonaws.com/acc-attini-artifacts-${AWS::Region}/attini-setup/*
                   - !Sub https://acc-attini-artifacts-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/attini-setup/*
+                  - !Sub https://s3.amazonaws.com/shared-attini-artifacts-${AWS::Region}/attini-setup/*
+                  - !Sub https://shared-attini-artifacts-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/attini-setup/*
           - Action:
               - dynamodb:*
             Effect: Allow
@@ -1641,7 +1643,14 @@ Resources:
             Effect: Allow
             Resource:
               - !Sub arn:aws:s3:::attini-*
-              - !Sub arn:aws:s3:::acc-attini-*
+          - Action:
+              - s3:ListBucket
+              - s3:GetObject*
+            Resource:
+              - arn:aws:s3:::attini-artifacts-*
+              - arn:aws:s3:::acc-attini-artifacts-*
+              - arn:aws:s3:::shared-attini-artifacts-*
+            Effect: Allow
           - Action:
               - s3:PutObject*
               - s3:DeleteObject*
