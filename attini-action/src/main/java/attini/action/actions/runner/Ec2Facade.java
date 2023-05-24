@@ -14,6 +14,7 @@ import org.jboss.logging.Logger;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.system.EnvironmentVariables;
 import attini.domain.polling.Poller;
 import attini.domain.polling.PollingResult;
@@ -47,6 +48,7 @@ public class Ec2Facade {
     private final SsmClient ssmClient;
     private final ObjectMapper objectMapper;
     private final EcsFacade ecsFacade;
+    private final ResourceStateFacade resourceStateFacade;
 
     private final static Map<String, String> imageIdMap = Map.of("AmazonLinux2",
                                                                  "/aws/service/ecs/optimized-ami/amazon-linux-2/kernel-5.10/recommended",
@@ -67,17 +69,23 @@ public class Ec2Facade {
                      EnvironmentVariables environmentVariables,
                      SsmClient ssmClient,
                      ObjectMapper objectMapper,
-                     EcsFacade ecsFacade) {
+                     EcsFacade ecsFacade,
+                     ResourceStateFacade resourceStateFacade) {
         this.ec2Client = requireNonNull(ec2Client, "ec2Client");
         this.environmentVariables = requireNonNull(environmentVariables, "environmentVariables");
         this.ssmClient = requireNonNull(ssmClient, "ssmClient");
         this.objectMapper = requireNonNull(objectMapper, "objectMapper");
         this.ecsFacade = requireNonNull(ecsFacade, "ecsFacade");
+        this.resourceStateFacade = requireNonNull(resourceStateFacade, "stackDataDynamoFacade");
     }
 
     public String startInstance(Ec2 ec2, RunnerData runnerData) {
 
         logger.info("Starting new ec2 instance");
+        if (!resourceStateFacade.acquireEc2StartLock(runnerData)) {
+           throw new AcquireEc2StartLockException();
+        }
+
 
         String imageId = getImageId(ec2.getEc2Config().ami().orElse("AmazonLinux2"));
         String deviceName = ec2Client.describeImages(DescribeImagesRequest.builder().imageIds(imageId).build())
@@ -221,7 +229,7 @@ public class Ec2Facade {
                                                                    .build());
 
         Poller.builder(() -> new PollingResult<>(ecsFacade.isRegisterWithCluster(instanceId, runnerData), null))
-              .setCalls(90)
+              .setCalls(120)
               .setInterval(2, TimeUnit.SECONDS)
               .setTimeoutExceptionSupplier(() -> {
                   InstanceStatus instanceStatus = getInstanceStatus(instanceId);

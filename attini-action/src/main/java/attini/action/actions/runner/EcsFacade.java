@@ -8,6 +8,7 @@ import java.util.Set;
 
 import org.jboss.logging.Logger;
 
+import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.system.EnvironmentVariables;
 import software.amazon.awssdk.services.ecs.EcsClient;
 import software.amazon.awssdk.services.ecs.model.AwsVpcConfiguration;
@@ -43,10 +44,14 @@ public class EcsFacade {
 
     private final EcsClient ecsClient;
     private final EnvironmentVariables environmentVariables;
+    private final ResourceStateFacade resourceStateFacade;
 
-    public EcsFacade(EcsClient ecsClient, EnvironmentVariables environmentVariables) {
+    public EcsFacade(EcsClient ecsClient,
+                     EnvironmentVariables environmentVariables,
+                     ResourceStateFacade resourceStateFacade) {
         this.ecsClient = requireNonNull(ecsClient, "ecsClient");
         this.environmentVariables = requireNonNull(environmentVariables, "environmentVariables");
+        this.resourceStateFacade = requireNonNull(resourceStateFacade, "resourceStateFacade");
     }
 
     public TaskStatus getTaskStatus(String taskId, String cluster) {
@@ -72,11 +77,11 @@ public class EcsFacade {
         }
     }
 
-    public void stopTask(String taskId, String cluster) {
+    public void stopTask(String taskId, String cluster, String stopReason) {
         StopTaskRequest.Builder builder = StopTaskRequest.builder()
                                                          .task(taskId)
                                                          .cluster(cluster)
-                                                         .reason("Configuration change");
+                                                         .reason(stopReason);
 
         ecsClient.stopTask(builder.build());
 
@@ -118,8 +123,12 @@ public class EcsFacade {
     public String startTask(RunnerData runnerData,
                             String sfnToken) {
 
-
         try {
+
+          if (!resourceStateFacade.acquireEcsStartLock(runnerData)){
+              throw new AcquireEcsStartLockException();
+          }
+
             TaskConfiguration runnerConfig = runnerData.getTaskConfiguration();
 
             NetworkConfiguration networkConfiguration =

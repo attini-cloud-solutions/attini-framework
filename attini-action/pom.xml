@@ -158,7 +158,6 @@
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>lambda</artifactId>
-            <version>${aws.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>software.amazon.awssdk</groupId>
@@ -187,7 +186,6 @@
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>organizations</artifactId>
-            <version>${aws.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>software.amazon.awssdk</groupId>

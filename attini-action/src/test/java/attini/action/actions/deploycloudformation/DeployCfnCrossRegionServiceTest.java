@@ -16,7 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import attini.action.builders.TestBuilders;
 import attini.action.domain.DesiredState;
-import attini.action.facades.stackdata.StackDataFacade;
+import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
 import attini.action.facades.stepguard.StepGuardFacade;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
@@ -30,7 +30,7 @@ class DeployCfnCrossRegionServiceTest {
     @Mock
     private StepGuardFacade stepGuardFacade;
     @Mock
-    private StackDataFacade stackDataFacade;
+    private ResourceStateFacade resourceStateFacade;
     @Mock
     private StepFunctionFacade stepFunctionFacade;
     @Mock
@@ -42,7 +42,7 @@ class DeployCfnCrossRegionServiceTest {
     void setUp() {
         deployCfnCrossRegionService = new DeployCfnCrossRegionService(cfnStackFacade,
                                                                       stepGuardFacade,
-                                                                      stackDataFacade,
+                                                                      resourceStateFacade,
                                                                       stepFunctionFacade,
                                                                       cfnErrorHandler);
     }
@@ -51,7 +51,7 @@ class DeployCfnCrossRegionServiceTest {
     public void shouldUpdateStack() {
         StackData stackData = TestBuilders.aStackData().build();
 
-        when(stackDataFacade.getStacksSfnExecutionArn(stackData.getStackConfiguration())).thenReturn(Optional.of(
+        when(resourceStateFacade.getStacksSfnExecutionArn(stackData.getStackConfiguration())).thenReturn(Optional.of(
                 SfnExecutionArn.create("")));
 
         when(cfnStackFacade.getStackStatus(stackData)).thenReturn(new StackStatus("22222",
@@ -89,7 +89,7 @@ class DeployCfnCrossRegionServiceTest {
                                                                              .build())
                                           .build();
 
-        when(stackDataFacade.getStacksSfnExecutionArn(stackData.getStackConfiguration())).thenReturn(Optional.of(
+        when(resourceStateFacade.getStacksSfnExecutionArn(stackData.getStackConfiguration())).thenReturn(Optional.of(
                 SfnExecutionArn.create("")));
 
         when(cfnStackFacade.getStackStatus(stackData)).thenReturn(new StackStatus("22222",

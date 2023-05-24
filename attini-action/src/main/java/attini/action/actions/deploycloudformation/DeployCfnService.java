@@ -12,7 +12,7 @@ import org.jboss.logging.Logger;
 
 import attini.action.actions.deploycloudformation.CloudFormationErrorResolver.CloudFormationError;
 import attini.action.domain.DesiredState;
-import attini.action.facades.stackdata.StackDataFacade;
+import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
 import software.amazon.awssdk.services.cloudformation.model.AlreadyExistsException;
 import software.amazon.awssdk.services.cloudformation.model.CloudFormationException;
@@ -20,17 +20,17 @@ import software.amazon.awssdk.services.cloudformation.model.CloudFormationExcept
 public class DeployCfnService {
     private static final Logger logger = Logger.getLogger(DeployCfnService.class);
     private final CfnStackFacade cfnStackFacade;
-    private final StackDataFacade stackDataFacade;
+    private final ResourceStateFacade resourceStateFacade;
     private final StepFunctionFacade stepFunctionFacade;
     private final CfnErrorHandler cfnErrorHandler;
 
 
     public DeployCfnService(CfnStackFacade cfnStackFacade,
-                            StackDataFacade stackDataFacade,
+                            ResourceStateFacade resourceStateFacade,
                             StepFunctionFacade stepFunctionFacade,
                             CfnErrorHandler cfnErrorHandler) {
         this.cfnStackFacade = requireNonNull(cfnStackFacade, "cfnStackFacade");
-        this.stackDataFacade = requireNonNull(stackDataFacade, "stackDataFacade");
+        this.resourceStateFacade = requireNonNull(resourceStateFacade, "stackDataFacade");
         this.stepFunctionFacade = requireNonNull(stepFunctionFacade, "stepFunctionFacade");
         this.cfnErrorHandler = requireNonNull(cfnErrorHandler, "cfnErrorHandler");
     }
@@ -53,9 +53,9 @@ public class DeployCfnService {
             cfnStackFacade.deleteStack(stackData);
             logger.info("Stack " + stackData.getStackConfiguration()
                                             .getStackName() + " is being deleted using callback strategy");
-            stackDataFacade.saveStackData(stackData);
-            stackDataFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                      stackData.getStackConfiguration());
+            resourceStateFacade.saveStackData(stackData);
+            resourceStateFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
+                                          stackData.getStackConfiguration());
 
 
         } catch (CloudFormationException e) {
@@ -77,10 +77,10 @@ public class DeployCfnService {
     private void deployWithCallback(StackData stackData) {
         try {
             String stackId = cfnStackFacade.updateCfnStack(stackData);
-            stackDataFacade.saveStackData(stackData, stackId);
+            resourceStateFacade.saveStackData(stackData, stackId);
 
-            stackDataFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                      stackData.getStackConfiguration());
+            resourceStateFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
+                                          stackData.getStackConfiguration());
 
         } catch (CloudFormationException e) {
             CloudFormationError cloudFormationError = resolveError(e);
@@ -114,10 +114,10 @@ public class DeployCfnService {
 
         try {
             String stackId = cfnStackFacade.createCfnStack(stackData);
-            stackDataFacade.saveStackData(stackData, stackId);
+            resourceStateFacade.saveStackData(stackData, stackId);
 
-            stackDataFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                      stackData.getStackConfiguration());
+            resourceStateFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
+                                          stackData.getStackConfiguration());
 
         } catch (AlreadyExistsException e) {
             stepFunctionFacade.sendError(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),

@@ -34,8 +34,8 @@ import attini.action.facades.stackdata.DeploymentPlanDataFacade;
 import attini.action.facades.stackdata.DistributionDataFacade;
 import attini.action.facades.stackdata.InitStackDataDynamoFacade;
 import attini.action.facades.stackdata.InitStackDataFacade;
-import attini.action.facades.stackdata.StackDataDynamoFacade;
-import attini.action.facades.stackdata.StackDataFacade;
+import attini.action.facades.stackdata.ResourceStateDynamoFacade;
+import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
 import attini.action.facades.stepguard.StepGuardFacade;
 import attini.action.licence.LicenceAgreementHandler;
@@ -79,12 +79,12 @@ public class BeanConfig {
     @ApplicationScoped
     SamPackageRunnerAdapter samPackageRunnerAdapter(RunnerHandler runnerHandler,
                                                     ArtifactStoreFacade artifactStoreFacade,
-                                                    StackDataFacade stackDataFacade,
+                                                    ResourceStateFacade resourceStateFacade,
                                                     StackConfigurationService stackConfigurationService,
                                                     StepFunctionFacade stepFunctionFacade) {
         return new SamPackageRunnerAdapter(runnerHandler,
                                            artifactStoreFacade,
-                                           stackDataFacade,
+                                           resourceStateFacade,
                                            stackConfigurationService, stepFunctionFacade);
 
     }
@@ -107,8 +107,8 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
-    public EcsFacade ecsFacade(EnvironmentVariables environmentVariables) {
-        return new EcsFacade(EcsClient.create(), environmentVariables);
+    public EcsFacade ecsFacade(EnvironmentVariables environmentVariables, ResourceStateFacade resourceStateFacade ) {
+        return new EcsFacade(EcsClient.create(), environmentVariables, resourceStateFacade);
     }
 
     @ApplicationScoped
@@ -127,24 +127,25 @@ public class BeanConfig {
 
     @ApplicationScoped
     Ec2Facade ec2Facade(EnvironmentVariables environmentVariables, @CustomAwsClient SsmClient ssmClient,
-                        ObjectMapper objectMapper, EcsFacade ecsFacade) {
+                        ObjectMapper objectMapper, EcsFacade ecsFacade, ResourceStateFacade resourceStateFacade) {
         return new Ec2Facade(Ec2Client.builder()
                                       .httpClient(UrlConnectionHttpClient.builder().build())
                                       .build(), environmentVariables,
                              ssmClient,
                              objectMapper,
-                             ecsFacade);
+                             ecsFacade,
+                             resourceStateFacade);
     }
 
     @ApplicationScoped
     public RunnerHandler runnerHandler(SqsClient sqsClient,
-                                       StackDataDynamoFacade stackDataDynamoFacade,
+                                       ResourceStateDynamoFacade resourceStateDynamoFacade,
                                        StepFunctionFacade stepFunctionFacade,
                                        EcsFacade ecsFacade, ObjectMapper objectMapper,
                                        Ec2Facade ec2Facade) {
         return new RunnerHandler(sqsClient,
                                  ecsFacade,
-                                 stackDataDynamoFacade,
+                                 resourceStateDynamoFacade,
                                  stepFunctionFacade, objectMapper, ec2Facade);
     }
 
@@ -195,10 +196,10 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
-    public StackDataDynamoFacade stackDataDynamoFacade(EnvironmentVariables environmentVariables,
-                                                       @CustomAwsClient DynamoDbClient dynamoDbClient) {
-        return new StackDataDynamoFacade(dynamoDbClient,
-                                         environmentVariables);
+    public ResourceStateDynamoFacade stackDataDynamoFacade(EnvironmentVariables environmentVariables,
+                                                           @CustomAwsClient DynamoDbClient dynamoDbClient) {
+        return new ResourceStateDynamoFacade(dynamoDbClient,
+                                             environmentVariables);
     }
 
     @ApplicationScoped
@@ -307,23 +308,23 @@ public class BeanConfig {
     @ApplicationScoped
     CfnErrorHandler cfnErrorHandler(CfnStackFacade cfnStackFacade,
                                     StepGuardFacade stepGuardFacade,
-                                    StackDataFacade stackDataFacade,
+                                    ResourceStateFacade resourceStateFacade,
                                     StepFunctionFacade stepFunctionFacade) {
         return new CfnErrorHandler(cfnStackFacade,
                                    stepGuardFacade,
-                                   stackDataFacade,
+                                   resourceStateFacade,
                                    stepFunctionFacade);
     }
 
     @ApplicationScoped
     DeployCfnCrossRegionService deployCfnCrossRegionService(CfnStackFacade cfnStackFacade,
-                                                            StackDataFacade stackDataFacade,
+                                                            ResourceStateFacade resourceStateFacade,
                                                             StepFunctionFacade stepFunctionFacade,
                                                             StepGuardFacade stepGuardFacade,
                                                             CfnErrorHandler cfnErrorHandler) {
         return new DeployCfnCrossRegionService(cfnStackFacade,
                                                stepGuardFacade,
-                                               stackDataFacade,
+                                               resourceStateFacade,
                                                stepFunctionFacade,
                                                cfnErrorHandler);
     }
@@ -331,11 +332,11 @@ public class BeanConfig {
 
     @ApplicationScoped
     DeployCfnService deployCfnStackService(CfnStackFacade cfnStackFacade,
-                                           StackDataFacade stackDataFacade,
+                                           ResourceStateFacade resourceStateFacade,
                                            StepFunctionFacade stepFunctionFacade,
                                            CfnErrorHandler cfnErrorHandler) {
         return new DeployCfnService(cfnStackFacade,
-                                    stackDataFacade,
+                                    resourceStateFacade,
                                     stepFunctionFacade,
                                     cfnErrorHandler);
     }

@@ -17,7 +17,7 @@ import attini.action.domain.CfnStackConfig;
 import attini.action.facades.artifactstore.ArtifactStoreFacade;
 import attini.action.facades.artifactstore.MetadataFile;
 import attini.action.facades.artifactstore.SamMetadata;
-import attini.action.facades.stackdata.StackDataFacade;
+import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.facades.stackdata.StackTemplate;
 import attini.action.facades.stepfunction.StepFunctionFacade;
 import attini.domain.DeployOriginData;
@@ -27,19 +27,19 @@ public class SamPackageRunnerAdapter {
     private static final Logger logger = Logger.getLogger(SamPackageRunnerAdapter.class);
     private final RunnerHandler runnerHandler;
     private final ArtifactStoreFacade artifactStoreFacade;
-    private final StackDataFacade stackDataFacade;
+    private final ResourceStateFacade resourceStateFacade;
     private final StackConfigurationService stackConfigurationService;
     private final StepFunctionFacade stepFunctionFacade;
 
 
     public SamPackageRunnerAdapter(RunnerHandler runnerHandler,
                                    ArtifactStoreFacade artifactStoreFacade,
-                                   StackDataFacade stackDataFacade,
+                                   ResourceStateFacade resourceStateFacade,
                                    StackConfigurationService stackConfigurationService,
                                    StepFunctionFacade stepFunctionFacade) {
         this.runnerHandler = requireNonNull(runnerHandler, "runnerHandler");
         this.artifactStoreFacade = requireNonNull(artifactStoreFacade, "artifactStoreFacade");
-        this.stackDataFacade = requireNonNull(stackDataFacade, "stackDataFacade");
+        this.resourceStateFacade = requireNonNull(resourceStateFacade, "stackDataFacade");
         this.stackConfigurationService = requireNonNull(stackConfigurationService, "stackConfigurationService");
         this.stepFunctionFacade = requireNonNull(stepFunctionFacade, "stepFunctionFacade");
     }
@@ -48,7 +48,7 @@ public class SamPackageRunnerAdapter {
 
 
         StackConfiguration stackConfig = stackConfigurationService.getStackConfig(cfnConfig, false);
-        Optional<StackTemplate> stackTemplate = stackDataFacade.getStackTemplate(stackConfig);
+        Optional<StackTemplate> stackTemplate = resourceStateFacade.getStackTemplate(stackConfig);
         if (stackTemplate.isPresent() && stackTemplate.get()
                                                       .objectIdentifier()
                                                       .equals(samInput.deployOriginData().getObjectIdentifier())) {

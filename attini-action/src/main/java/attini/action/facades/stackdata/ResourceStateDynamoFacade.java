@@ -15,51 +15,38 @@ import java.util.Optional;
 import org.jboss.logging.Logger;
 
 import attini.action.actions.deploycloudformation.SfnExecutionArn;
-import attini.action.actions.runner.Ec2;
-import attini.domain.DeployOriginData;
-import attini.action.actions.deploycloudformation.stackconfig.StackConfiguration;
 import attini.action.actions.deploycloudformation.StackData;
+import attini.action.actions.deploycloudformation.stackconfig.StackConfiguration;
+import attini.action.actions.runner.Ec2;
 import attini.action.actions.runner.RunnerData;
 import attini.action.actions.runner.RunnerDataConverter;
 import attini.action.domain.DeploymentPlanExecutionMetadata;
 import attini.action.system.EnvironmentVariables;
+import attini.domain.DeployOriginData;
 import attini.domain.ObjectIdentifier;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeAction;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValueUpdate;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
-public class StackDataDynamoFacade implements StackDataFacade {
+public class ResourceStateDynamoFacade implements ResourceStateFacade {
 
 
-    private static final Logger logger = Logger.getLogger(StackDataDynamoFacade.class);
+    private static final Logger logger = Logger.getLogger(ResourceStateDynamoFacade.class);
 
     private final DynamoDbClient dynamoDbClient;
     private final EnvironmentVariables environmentVariables;
 
 
-    public StackDataDynamoFacade(DynamoDbClient dynamoDbClient, EnvironmentVariables environmentVariables) {
+    public ResourceStateDynamoFacade(DynamoDbClient dynamoDbClient, EnvironmentVariables environmentVariables) {
         this.dynamoDbClient = requireNonNull(dynamoDbClient, "dynamoDbClient");
         this.environmentVariables = requireNonNull(environmentVariables, "environmentVariables");
     }
 
-
-    @Override
-    public RunnerData getRunnerData(String stackName, String runnerName, boolean consistentRead) {
-
-        GetItemResponse response = dynamoDbClient.getItem(GetItemRequest.builder()
-                                                                        .tableName(environmentVariables.getResourceStatesTableName())
-                                                                        .key(createDynamoKey(stackName, runnerName))
-                                                                        .consistentRead(consistentRead)
-                                                                        .build());
-
-
-        Map<String, AttributeValue> item = response.item();
-        return RunnerDataConverter.convert(item);
-    }
 
     @Override
     public RunnerData getRunnerData(String stackName, String runnerName) {
@@ -72,6 +59,70 @@ public class StackDataDynamoFacade implements StackDataFacade {
 
         Map<String, AttributeValue> item = response.item();
         return RunnerDataConverter.convert(item);
+    }
+
+    @Override
+    public boolean acquireEc2StartLock(RunnerData runnerData) {
+
+        String executionId = runnerData.getStartedByExecutionArn().map(SfnExecutionArn::extractExecutionId).orElse("");
+        String conditionExpression = "attribute_not_exists(#ec2Configuration.#startedByExecution)" + runnerData.getStartedByExecutionArn()
+                                                                                                               .map(sfnExecutionArn -> " OR #ec2Configuration.#startedByExecution <> :v_executionId")
+                                                                                                               .orElse("");
+        try {
+            dynamoDbClient.updateItem(UpdateItemRequest.builder()
+                                                       .tableName(environmentVariables.getResourceStatesTableName())
+                                                       .key(createDynamoKey(runnerData.getStackName(),
+                                                                            runnerData.getRunnerName()))
+                                                       .updateExpression(
+                                                               "SET #ec2Configuration.#startedByExecution = :v_executionId")
+                                                       .expressionAttributeNames(Map.of("#ec2Configuration",
+                                                                                        "ec2Configuration",
+                                                                                        "#startedByExecution",
+                                                                                        "startedByExecution"))
+                                                       .expressionAttributeValues(Map.of(":v_executionId",
+                                                                                         AttributeValue.builder()
+                                                                                                       .s(executionId)
+                                                                                                       .build()))
+                                                       .conditionExpression(
+                                                               conditionExpression)
+                                                       .build());
+
+            return true;
+        } catch (ConditionalCheckFailedException e) {
+            logger.info("Failed to acquire lock for starting ec2 instance");
+            return false;
+        }
+
+    }
+
+    @Override
+    public boolean acquireEcsStartLock(RunnerData runnerData) {
+        String executionId = runnerData.getStartedByExecutionArn().map(SfnExecutionArn::extractExecutionId).orElse("");
+        String conditionExpression = "attribute_not_exists(#taskStartedByExecution)" + runnerData.getStartedByExecutionArn()
+                                                                                                               .map(sfnExecutionArn -> " OR #taskStartedByExecution <> :v_executionId")
+                                                                                                               .orElse("");
+        try {
+            dynamoDbClient.updateItem(UpdateItemRequest.builder()
+                                                       .tableName(environmentVariables.getResourceStatesTableName())
+                                                       .key(createDynamoKey(runnerData.getStackName(),
+                                                                            runnerData.getRunnerName()))
+                                                       .updateExpression(
+                                                               "SET #taskStartedByExecution = :v_executionId")
+                                                       .expressionAttributeNames(Map.of("#taskStartedByExecution",
+                                                                                        "taskStartedByExecution"))
+                                                       .expressionAttributeValues(Map.of(":v_executionId",
+                                                                                         AttributeValue.builder()
+                                                                                                       .s(executionId)
+                                                                                                       .build()))
+                                                       .conditionExpression(
+                                                               conditionExpression)
+                                                       .build());
+
+            return true;
+        } catch (ConditionalCheckFailedException e) {
+            logger.info("Failed to acquire lock for starting ecs instance");
+            return false;
+        }
     }
 
 
