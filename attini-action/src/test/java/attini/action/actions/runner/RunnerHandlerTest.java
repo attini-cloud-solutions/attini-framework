@@ -1,7 +1,6 @@
 package attini.action.actions.runner;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,7 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import attini.action.actions.runner.input.RunnerInput;
-import attini.action.facades.stackdata.StackDataDynamoFacade;
+import attini.action.facades.stackdata.ResourceStateDynamoFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
@@ -28,7 +27,7 @@ class RunnerHandlerTest {
     @Mock
     private EcsFacade ecsFacade;
     @Mock
-    private StackDataDynamoFacade stackDataDynamoFacade;
+    private ResourceStateDynamoFacade resourceStateDynamoFacade;
     @Mock
     private StepFunctionFacade stepFunctionFacade;
 
@@ -43,7 +42,7 @@ class RunnerHandlerTest {
     void setUp() {
         runnerHandler = new RunnerHandler(sqsClient,
                                           ecsFacade,
-                                          stackDataDynamoFacade,
+                                          resourceStateDynamoFacade,
                                           stepFunctionFacade,
                                           objectMapper, ec2Facade);
     }
@@ -58,10 +57,9 @@ class RunnerHandlerTest {
                                                      .build();
 
 
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
+        when(resourceStateDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
                 runnerData);
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString(), anyBoolean())).thenReturn(
-                runnerData);
+        //noinspection OptionalGetWithoutIsPresent
         when(ecsFacade.getTaskStatus(runnerData.getTaskId().get(), runnerData.getCluster())).thenReturn(
                 TaskStatus.deadTask());
         when(ecsFacade.startTask(any(), anyString())).thenReturn("my-new-id");
@@ -93,10 +91,9 @@ class RunnerHandlerTest {
                                                      .build();
 
 
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
+        when(resourceStateDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
                 runnerData);
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString(), anyBoolean())).thenReturn(
-                runnerData);
+        //noinspection OptionalGetWithoutIsPresent
         when(ecsFacade.getTaskStatus(runnerData.getTaskId().get(), runnerData.getCluster())).thenReturn(
                 TaskStatus.deadTask());
         when(ecsFacade.startTask(any(), anyString())).thenReturn(taskId);
@@ -137,10 +134,9 @@ class RunnerHandlerTest {
                                                      .build();
 
 
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
+        when(resourceStateDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
                 runnerData);
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString(), anyBoolean())).thenReturn(
-                runnerData);
+        //noinspection OptionalGetWithoutIsPresent
         when(ecsFacade.getTaskStatus(runnerData.getTaskId().get(), runnerData.getCluster())).thenReturn(
                 TaskStatus.deadTask());
         when(ecsFacade.startTask(any(), anyString())).thenThrow(new TaskStartFailedSyncException("Failed!"));
@@ -177,10 +173,9 @@ class RunnerHandlerTest {
                                                      .build();
 
 
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
+        when(resourceStateDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
                 runnerData);
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString(), anyBoolean())).thenReturn(
-                runnerData);
+        //noinspection OptionalGetWithoutIsPresent
         when(ecsFacade.getTaskStatus(runnerData.getTaskId().get(), runnerData.getCluster())).thenReturn(
                 TaskStatus.deadTask());
         when(ecsFacade.startTask(any(), anyString())).thenReturn("my-new-id");
@@ -220,11 +215,10 @@ class RunnerHandlerTest {
                                                                                        .executionArn())
                                                      .ec2(ec2)
                                                      .build();
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
-                runnerData);
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString(), anyBoolean())).thenReturn(
+        when(resourceStateDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
                 runnerData);
         when(ecsFacade.startTask(any(), anyString())).thenReturn("my-new-id");
+        //noinspection OptionalGetWithoutIsPresent
         when(ecsFacade.getTaskStatus(runnerData.getTaskId().get(), runnerData.getCluster())).thenReturn(
                 TaskStatus.deadTask());
         when(ecsFacade.getTaskStatus("my-new-id", runnerData.getCluster())).thenReturn(new TaskStatus(
@@ -252,10 +246,9 @@ class RunnerHandlerTest {
                                                      .build();
 
 
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
+        when(resourceStateDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
                 runnerData);
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString(), anyBoolean())).thenReturn(
-                runnerData);
+        //noinspection OptionalGetWithoutIsPresent
         when(ecsFacade.getTaskStatus(runnerData.getTaskId().get(),
                                      runnerData.getCluster())).thenReturn(new TaskStatus("RUNNING",
                                                                                          "RUNNING",
@@ -284,10 +277,9 @@ class RunnerHandlerTest {
 
 
         when(ecsFacade.startTask(any(), anyString())).thenReturn("a-new-task-id");
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
+        when(resourceStateDynamoFacade.getRunnerData(anyString(), anyString())).thenReturn(
                 runnerData);
-        when(stackDataDynamoFacade.getRunnerData(anyString(), anyString(), anyBoolean())).thenReturn(
-                runnerData);
+        //noinspection OptionalGetWithoutIsPresent
         when(ecsFacade.getTaskStatus(runnerData.getTaskId().get(),
                                      runnerData.getCluster())).thenReturn(new TaskStatus("RUNNING",
                                                                                          "RUNNING",
@@ -295,7 +287,7 @@ class RunnerHandlerTest {
                                                                                          null));
 
         runnerHandler.handle(runnerInput);
-        verify(ecsFacade).stopTask(runnerData.getTaskId().get(), runnerData.getCluster());
+        verify(ecsFacade).stopTask(runnerData.getTaskId().get(), runnerData.getCluster(), "Configuration change");
         verify(ecsFacade).startTask(runnerData, runnerInput.deploymentPlanExecutionMetadata().sfnToken());
     }
 

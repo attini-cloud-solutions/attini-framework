@@ -8,7 +8,7 @@ import java.util.Optional;
 import org.jboss.logging.Logger;
 
 import attini.action.domain.DesiredState;
-import attini.action.facades.stackdata.StackDataFacade;
+import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
 import attini.action.facades.stepguard.StepGuardFacade;
 import software.amazon.awssdk.services.cloudformation.model.CloudFormationException;
@@ -19,19 +19,19 @@ public class DeployCfnCrossRegionService {
 
     private final CfnStackFacade cfnStackFacade;
     private final StepGuardFacade stepGuardFacade;
-    private final StackDataFacade stackDataFacade;
+    private final ResourceStateFacade resourceStateFacade;
     private final StepFunctionFacade stepFunctionFacade;
     private final CfnErrorHandler cfnErrorHandler;
 
 
     public DeployCfnCrossRegionService(CfnStackFacade cfnStackFacade,
                                        StepGuardFacade stepGuardFacade,
-                                       StackDataFacade stackDataFacade,
+                                       ResourceStateFacade resourceStateFacade,
                                        StepFunctionFacade stepFunctionFacade,
                                        CfnErrorHandler cfnErrorHandler) {
         this.cfnStackFacade = requireNonNull(cfnStackFacade, "cfnStackFacade");
         this.stepGuardFacade = requireNonNull(stepGuardFacade, "stepGuardFacade");
-        this.stackDataFacade = requireNonNull(stackDataFacade, "stackDataFacade");
+        this.resourceStateFacade = requireNonNull(resourceStateFacade, "stackDataFacade");
         this.stepFunctionFacade = requireNonNull(stepFunctionFacade, "stepFunctionFacade");
         this.cfnErrorHandler = requireNonNull(cfnErrorHandler, "cfnErrorHandler");
     }
@@ -59,9 +59,9 @@ public class DeployCfnCrossRegionService {
             if (isNewExecution(stackData) && shouldDeleteStack(stackData)) {
                 logger.info("New request for stack deletion received. Will delete stack");
                 cfnStackFacade.deleteStack(stackData);
-                stackDataFacade.saveStackData(stackData);
-                stackDataFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                          stackData.getStackConfiguration());
+                resourceStateFacade.saveStackData(stackData);
+                resourceStateFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
+                                              stackData.getStackConfiguration());
                 stepFunctionFacade.sendError(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
                                              "Is in progress",
                                              "IsExecuting");
@@ -72,9 +72,9 @@ public class DeployCfnCrossRegionService {
             if (isNewExecution(stackData)) {
                 logger.info("New request for stack update received. Will update stack");
                 String stackId = cfnStackFacade.updateStackCrossRegion(stackData);
-                stackDataFacade.saveStackData(stackData, stackId);
-                stackDataFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                          stackData.getStackConfiguration());
+                resourceStateFacade.saveStackData(stackData, stackId);
+                resourceStateFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
+                                              stackData.getStackConfiguration());
                 stepFunctionFacade.sendError(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
                                              "Is in progress",
                                              "IsExecuting");
@@ -93,9 +93,9 @@ public class DeployCfnCrossRegionService {
                     if (!shouldDeleteStack(stackData)) {
                         logger.info("No stack found. Will create the stack");
                         String stackId = cfnStackFacade.createStackCrossRegion(stackData);
-                        stackDataFacade.saveStackData(stackData, stackId);
-                        stackDataFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                                  stackData.getStackConfiguration());
+                        resourceStateFacade.saveStackData(stackData, stackId);
+                        resourceStateFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
+                                                      stackData.getStackConfiguration());
                         stepFunctionFacade.sendError(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
                                                      "Is in progress",
                                                      "IsExecuting");
@@ -141,7 +141,7 @@ public class DeployCfnCrossRegionService {
     }
 
     private boolean isNewExecution(StackData stackData) {
-        Optional<SfnExecutionArn> stacksExecutionId = stackDataFacade.getStacksSfnExecutionArn(stackData.getStackConfiguration());
+        Optional<SfnExecutionArn> stacksExecutionId = resourceStateFacade.getStacksSfnExecutionArn(stackData.getStackConfiguration());
         return stacksExecutionId.filter(sfnExecutionArn -> stackData.getDeploymentPlanExecutionMetadata()
                                                                     .executionArn()
                                                                     .equals(sfnExecutionArn))

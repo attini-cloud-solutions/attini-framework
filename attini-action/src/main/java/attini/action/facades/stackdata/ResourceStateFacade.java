@@ -14,9 +14,13 @@ import attini.action.actions.runner.RunnerData;
 import attini.action.domain.DeploymentPlanExecutionMetadata;
 import attini.domain.DeployOriginData;
 
-public interface StackDataFacade {
+public interface ResourceStateFacade {
 
-    RunnerData getRunnerData(String stackName, String runnerName, boolean consistentRead);
+
+    boolean acquireEc2StartLock(RunnerData runnerData);
+
+    boolean acquireEcsStartLock(RunnerData runnerData);
+
 
     RunnerData getRunnerData(String stackName, String runnerName);
 

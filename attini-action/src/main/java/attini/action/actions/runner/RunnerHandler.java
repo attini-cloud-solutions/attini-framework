@@ -2,7 +2,6 @@ package attini.action.actions.runner;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.codec.digest.DigestUtils;
@@ -10,9 +9,9 @@ import org.jboss.logging.Logger;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import attini.action.actions.deploycloudformation.SfnExecutionArn;
 import attini.action.actions.runner.input.RunnerInput;
-import attini.action.facades.stackdata.StackDataDynamoFacade;
+import attini.action.facades.stackdata.ResourceStateDynamoFacade;
+import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
 import attini.domain.polling.Poller;
 import attini.domain.polling.PollingResult;
@@ -26,19 +25,19 @@ public class RunnerHandler {
 
     private final SqsClient sqsClient;
     private final EcsFacade ecsFacade;
-    private final StackDataDynamoFacade stackDataDynamoFacade;
+    private final ResourceStateFacade resourceStateFacade;
     private final StepFunctionFacade stepFunctionFacade;
     private final ObjectMapper objectMapper;
     private final Ec2Facade ec2Facade;
 
     public RunnerHandler(SqsClient sqsClient,
                          EcsFacade ecsFacade,
-                         StackDataDynamoFacade stackDataDynamoFacade,
+                         ResourceStateDynamoFacade resourceStateFacade,
                          StepFunctionFacade stepFunctionFacade,
                          ObjectMapper objectMapper, Ec2Facade ec2Facade) {
         this.sqsClient = requireNonNull(sqsClient, "sqsClient");
         this.ecsFacade = requireNonNull(ecsFacade, "ecsFacade");
-        this.stackDataDynamoFacade = requireNonNull(stackDataDynamoFacade, "stackDataDynamoFacade");
+        this.resourceStateFacade = requireNonNull(resourceStateFacade, "resourceStateFacade");
         this.stepFunctionFacade = requireNonNull(stepFunctionFacade, "stepFunctionFacade");
         this.objectMapper = requireNonNull(objectMapper, "objectMapper");
         this.ec2Facade = requireNonNull(ec2Facade, "ec2Facade");
@@ -53,11 +52,11 @@ public class RunnerHandler {
                                                              .executionArn() + runnerInput.deploymentPlanExecutionMetadata()
                                                                                           .stepName());
 
-            RunnerData runnerData = stackDataDynamoFacade.getRunnerData(runnerInput.deployOriginData().getStackName(),
-                                                                        runnerInput.properties().runner()).toBuilder()
-                                                         .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
+            RunnerData runnerData = resourceStateFacade.getRunnerData(runnerInput.deployOriginData().getStackName(),
+                                                                      runnerInput.properties().runner()).toBuilder()
+                                                       .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
                                                                                            .executionArn())
-                                                         .build();
+                                                       .build();
 
             sqsClient.sendMessage(SendMessageRequest.builder()
                                                     .queueUrl(runnerData.getTaskConfiguration().queueUrl())
@@ -67,13 +66,18 @@ public class RunnerHandler {
                                                                              runnerData.currentConfigurationHash()))
                                                     .build());
 
-            stackDataDynamoFacade.saveRunnerData(runnerData);
+            resourceStateFacade.saveRunnerData(runnerData);
 
             RunnerData runnerDataWithEc2Id = startEc2IfConfigured(runnerData);
 
             startNewTaskIfNotRunning(runnerDataWithEc2Id,
                                      runnerInput.deploymentPlanExecutionMetadata().sfnToken(),
                                      runnerInput);
+
+        } catch (AcquireEc2StartLockException e){
+            logger.info("Failed to acquire lock for starting the EC2 instance. Another step has started it and will assume responsibility for starting the ECS task");
+        } catch (AcquireEcsStartLockException e){
+            logger.info("Failed to acquire lock for starting the ECS instance.");
         } catch (Ec2FailedToStartException e) {
             logger.error("EC2 instance did not start correctly", e);
             stepFunctionFacade.sendError(runnerInput.deploymentPlanExecutionMetadata().sfnToken(),
@@ -94,25 +98,6 @@ public class RunnerHandler {
             runnerData.getTaskId()
                       .ifPresentOrElse(taskId -> {
 
-                          Optional<SfnExecutionArn> startedByExecutionArn =
-                                  stackDataDynamoFacade.getRunnerData(runnerInput.deployOriginData()
-                                                                                 .getStackName(),
-                                                                      runnerInput.properties()
-                                                                                 .runner(),
-                                                                      true)
-                                                       .getStartedByExecutionArn();
-
-                          if (taskIdHasChanged(runnerData, runnerInput)) {
-                              logger.info(
-                                      "Task id has changed during execution. This indicated another parallel branch has started the task.");
-                              return;
-                          }
-
-                          if (!runnerData.getStartedByExecutionArn().equals(startedByExecutionArn)) {
-                              String message = "Parallel executions detected. Aborting current execution.";
-                              logger.warn(message);
-                              throw new TaskStartFailedSyncException(message);
-                          }
                           TaskStatus taskStatus = ecsFacade.getTaskStatus(
                                   taskId, runnerData.getCluster());
 
@@ -120,14 +105,14 @@ public class RunnerHandler {
                               logger.info("The task configuration has changed, will stop old task.");
 
                               runnerData.getEc2().ifPresentOrElse(ec2 -> {
-                                  stackDataDynamoFacade.saveRunnerData(runnerData.toBuilder()
-                                                                                 .shutdownHookDisabled(true)
-                                                                                 .build());
-                                  ecsFacade.stopTask(taskId, runnerData.getCluster());
+                                  resourceStateFacade.saveRunnerData(runnerData.toBuilder()
+                                                                               .shutdownHookDisabled(true)
+                                                                               .build());
+                                  ecsFacade.stopTask(taskId, runnerData.getCluster(), "Configuration change");
                                   logger.info(
                                           "Waiting for task to stop before starting new task to ensure EC2 instance is not terminated by the tasks shutdown hook");
                                   ecsFacade.waitUntilStopped(taskId, runnerData.getCluster());
-                              }, () -> ecsFacade.stopTask(taskId, runnerData.getCluster()));
+                              }, () -> ecsFacade.stopTask(taskId, runnerData.getCluster(), "Configuration change"));
 
                               startTask(runnerData, sfnToken, runnerInput);
                           } else if (taskStatus.isStoppingOrStopped()) {
@@ -153,16 +138,6 @@ public class RunnerHandler {
         }
 
 
-    }
-
-    private boolean taskIdHasChanged(RunnerData runnerData, RunnerInput runnerInput) {
-        Optional<String> currentTaskId = stackDataDynamoFacade.getRunnerData(runnerInput.deployOriginData()
-                                                                                        .getStackName(),
-                                                                             runnerInput.properties()
-                                                                                        .runner(), true)
-                                                              .getTaskId();
-
-        return !runnerData.getTaskId().equals(currentTaskId);
     }
 
     private boolean configurationHasChanged(RunnerData currentRunnerData) {
@@ -192,7 +167,6 @@ public class RunnerHandler {
             taskStatus = ecsFacade.getTaskStatus(taskId, cluster);
         }
 
-
         waitForRunnerStart(taskId, cluster, runnerInput);
 
         return taskStatus;
@@ -201,13 +175,13 @@ public class RunnerHandler {
     private void waitForRunnerStart(String taskId, String cluster, RunnerInput runnerInput) {
         logger.info("Waiting for runner to start");
         Poller.builder(() -> {
-                  RunnerData runnerData1 = stackDataDynamoFacade.getRunnerData(runnerInput.deployOriginData().getStackName(),
-                                                                               runnerInput.properties().runner());
+                  RunnerData runnerData1 = resourceStateFacade.getRunnerData(runnerInput.deployOriginData().getStackName(),
+                                                                             runnerInput.properties().runner());
 
 
                   if (!runnerData1.getTaskId().map(s -> s.equals(taskId)).orElse(false)) {
                       logger.error("TaskId changed in states table. Will stop task");
-                      ecsFacade.stopTask(taskId, cluster);
+                      ecsFacade.stopTask(taskId, cluster, "TaskId changed in state table");
                       return new PollingResult<>(true);
                   }
 
@@ -225,7 +199,7 @@ public class RunnerHandler {
               }).setCalls(300)
               .setInterval(2, TimeUnit.SECONDS)
                 .setTimeoutExceptionSupplier(() -> {
-                    ecsFacade.stopTask(taskId, cluster);
+                    ecsFacade.stopTask(taskId, cluster, "Task did not start within the expected time frame");
                     return new IllegalStateException("Task did not start within the expected time frame");
                 })
               .build()
@@ -275,7 +249,7 @@ public class RunnerHandler {
                                                        .configHashCode(ec2.getEc2Config().hashCode())
                                                        .build())
                                                .build();
-                             stackDataDynamoFacade.saveRunnerData(runnerDataWithEc2Id);
+                             resourceStateFacade.saveRunnerData(runnerDataWithEc2Id);
                              ec2Facade.waitForStart(instanceId, runnerData, ec2);
                              return runnerDataWithEc2Id;
 
@@ -298,7 +272,7 @@ public class RunnerHandler {
                                                  .shutdownHookDisabled(false)
                                                  .build();
 
-        stackDataDynamoFacade.saveRunnerData(updatedRunnerData);
+        resourceStateFacade.saveRunnerData(updatedRunnerData);
 
         TaskStatus taskStatus = waitForStart(taskArn, updatedRunnerData.getTaskConfiguration().cluster(), runnerInput);
 

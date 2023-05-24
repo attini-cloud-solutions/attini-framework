@@ -21,7 +21,7 @@ import attini.action.actions.deploycloudformation.stackconfig.StackConfiguration
 import attini.action.builders.TestBuilders;
 import attini.action.domain.DeploymentPlanExecutionMetadata;
 import attini.action.domain.DesiredState;
-import attini.action.facades.stackdata.StackDataFacade;
+import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
@@ -34,7 +34,7 @@ class DeployCfnStackServiceTest {
     @Mock
     CfnStackFacade cfnStackFacade;
     @Mock
-    StackDataFacade stackDataFacade;
+    ResourceStateFacade resourceStateFacade;
     @Mock
     StepFunctionFacade stepFunctionFacade;
     @Mock
@@ -45,7 +45,7 @@ class DeployCfnStackServiceTest {
     @BeforeEach
     void setUp() {
         deployCfnStackService = new DeployCfnService(cfnStackFacade,
-                                                     stackDataFacade,
+                                                     resourceStateFacade,
                                                      stepFunctionFacade,
                                                      cfnErrorHandler);
 
@@ -58,8 +58,8 @@ class DeployCfnStackServiceTest {
         StackData stackData = TestBuilders.aStackData().build();
         deployCfnStackService.deployStack(stackData);
 
-        verify(stackDataFacade).saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                          stackData.getStackConfiguration());
+        verify(resourceStateFacade).saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
+                                              stackData.getStackConfiguration());
         verify(cfnStackFacade).updateCfnStack(stackData);
 
     }
@@ -74,8 +74,8 @@ class DeployCfnStackServiceTest {
                                           .build();
         deployCfnStackService.deployStack(stackData);
 
-        verify(stackDataFacade).saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                          stackData.getStackConfiguration());
+        verify(resourceStateFacade).saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
+                                              stackData.getStackConfiguration());
         verify(cfnStackFacade).deleteStack(stackData);
 
     }
@@ -132,7 +132,7 @@ class DeployCfnStackServiceTest {
 
         deployCfnStackService.deployStack(stackData);
 
-        verify(stackDataFacade).saveToken(metaData.sfnToken(), stackConfig);
+        verify(resourceStateFacade).saveToken(metaData.sfnToken(), stackConfig);
         verify(cfnStackFacade).updateCfnStack(stackData);
         verify(cfnStackFacade).createCfnStack(stackData);
 

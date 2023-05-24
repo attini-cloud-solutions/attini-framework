@@ -35,7 +35,7 @@ import attini.action.domain.DeploymentPlanStateData;
 import attini.action.facades.artifactstore.ArtifactStoreFacade;
 import attini.action.facades.deployorigin.DeployOriginFacade;
 import attini.action.facades.stackdata.DeploymentPlanDataFacade;
-import attini.action.facades.stackdata.StackDataFacade;
+import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
 import attini.action.actions.runner.CouldNotParseInputException;
 import attini.action.licence.LicenceAgreementHandler;
@@ -58,7 +58,7 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
     private final ObjectMapper quarkusMapper;
     private final ArtifactStoreFacade artifactStoreFacade;
     private final ImportHandler importHandler;
-    private final StackDataFacade stackDataFacade;
+    private final ResourceStateFacade resourceStateFacade;
 
     private final DeploymentPlanDataFacade deploymentPlanDataFacade;
     private final CdkRunnerAdapter cdkRunnerAdapter;
@@ -76,7 +76,7 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
                ObjectMapper quarkusMapper,
                ArtifactStoreFacade artifactStoreFacade,
                ImportHandler importHandler,
-               StackDataFacade stackDataFacade,
+               ResourceStateFacade resourceStateFacade,
                DeploymentPlanDataFacade deploymentPlanDataFacade,
                CdkRunnerAdapter cdkRunnerAdapter, SamPackageRunnerAdapter samPackageRunnerAdapter) {
         this.cfnHandler = requireNonNull(cfnHandler, "deployCfnStackService");
@@ -91,7 +91,7 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
         this.quarkusMapper = requireNonNull(quarkusMapper, "quarkusMapper");
         this.artifactStoreFacade = requireNonNull(artifactStoreFacade, "artifactStoreFacade");
         this.importHandler = requireNonNull(importHandler, "readOutputHandler");
-        this.stackDataFacade = requireNonNull(stackDataFacade, "stackDataFacade");
+        this.resourceStateFacade = requireNonNull(resourceStateFacade, "stackDataFacade");
         this.deploymentPlanDataFacade = requireNonNull(deploymentPlanDataFacade, "deploymentPlanDataFacade");
         this.cdkRunnerAdapter = requireNonNull(cdkRunnerAdapter, "cdkRunnerAdapter");
         this.samPackageRunnerAdapter = requireNonNull(samPackageRunnerAdapter, "samPackageRunnerAdapter");
@@ -187,7 +187,7 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
                 DeploymentPlanExecutionMetadata deploymentPlanExecutionMetadata = quarkusMapper.convertValue(input.get(
                                                                                                                      "deploymentPlanExecutionMetadata"),
                                                                                                              DeploymentPlanExecutionMetadata.class);
-                stackDataFacade.saveManualApprovalData(deploymentPlanExecutionMetadata, deploymentOriginData);
+                resourceStateFacade.saveManualApprovalData(deploymentPlanExecutionMetadata, deploymentOriginData);
 
             }
 

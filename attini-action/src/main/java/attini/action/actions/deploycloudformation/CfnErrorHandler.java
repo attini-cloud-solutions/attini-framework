@@ -5,7 +5,7 @@ import static java.util.Objects.requireNonNull;
 import org.jboss.logging.Logger;
 
 import attini.action.actions.deploycloudformation.stackconfig.StackConfiguration;
-import attini.action.facades.stackdata.StackDataFacade;
+import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
 import attini.action.facades.stepguard.StepGuardFacade;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
@@ -17,22 +17,22 @@ public class CfnErrorHandler {
 
     private final CfnStackFacade cfnStackFacade;
     private final StepGuardFacade stepGuardFacade;
-    private final StackDataFacade stackDataFacade;
+    private final ResourceStateFacade resourceStateFacade;
     private final StepFunctionFacade stepFunctionFacade;
     public CfnErrorHandler(CfnStackFacade cfnStackFacade,
                            StepGuardFacade stepGuardFacade,
-                           StackDataFacade stackDataFacade,
+                           ResourceStateFacade resourceStateFacade,
                            StepFunctionFacade stepFunctionFacade) {
         this.cfnStackFacade = requireNonNull(cfnStackFacade, "cfnStackFacade");
         this.stepGuardFacade = requireNonNull(stepGuardFacade, "stepGuardFacade");
-        this.stackDataFacade = requireNonNull(stackDataFacade, "stackDataFacade");
+        this.resourceStateFacade = requireNonNull(resourceStateFacade, "stackDataFacade");
         this.stepFunctionFacade = requireNonNull(stepFunctionFacade, "stepFunctionFacade");
     }
 
     protected void handleNoUpdatesToPerformedState(StackData stackData, String resourceStatus) {
         String stackName = stackData.getStackConfiguration().getStackName();
         logger.info(String.format("No updates are to be performed to stack %s", stackName));
-        stackDataFacade.saveStackData(stackData);
+        resourceStateFacade.saveStackData(stackData);
         stepGuardFacade.notifyStepCompleted(stackData, resourceStatus);
 
 
