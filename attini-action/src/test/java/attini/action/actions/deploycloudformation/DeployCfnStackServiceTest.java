@@ -8,6 +8,7 @@ package attini.action.actions.deploycloudformation;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,9 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import attini.action.actions.deploycloudformation.stackconfig.StackConfiguration;
 import attini.action.builders.TestBuilders;
-import attini.action.domain.DeploymentPlanExecutionMetadata;
 import attini.action.domain.DesiredState;
 import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
@@ -58,8 +57,7 @@ class DeployCfnStackServiceTest {
         StackData stackData = TestBuilders.aStackData().build();
         deployCfnStackService.deployStack(stackData);
 
-        verify(resourceStateFacade).saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                              stackData.getStackConfiguration());
+        verify(resourceStateFacade).saveStackData(stackData);
         verify(cfnStackFacade).updateCfnStack(stackData);
 
     }
@@ -74,8 +72,7 @@ class DeployCfnStackServiceTest {
                                           .build();
         deployCfnStackService.deployStack(stackData);
 
-        verify(resourceStateFacade).saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                              stackData.getStackConfiguration());
+        verify(resourceStateFacade).saveStackData(stackData);
         verify(cfnStackFacade).deleteStack(stackData);
 
     }
@@ -119,8 +116,6 @@ class DeployCfnStackServiceTest {
     @Test
     public void deployStack_cloudFormationError_ifStackDontExistCreateIt() {
         StackData stackData = TestBuilders.aStackData().build();
-        DeploymentPlanExecutionMetadata metaData = stackData.getDeploymentPlanExecutionMetadata();
-        StackConfiguration stackConfig = stackData.getStackConfiguration();
         doThrow(CloudFormationException.builder()
                                        .awsErrorDetails(AwsErrorDetails.builder()
                                                                        .errorCode("SomeError")
@@ -132,7 +127,7 @@ class DeployCfnStackServiceTest {
 
         deployCfnStackService.deployStack(stackData);
 
-        verify(resourceStateFacade).saveToken(metaData.sfnToken(), stackConfig);
+        verify(resourceStateFacade, times(2)).saveStackData(stackData);
         verify(cfnStackFacade).updateCfnStack(stackData);
         verify(cfnStackFacade).createCfnStack(stackData);
 

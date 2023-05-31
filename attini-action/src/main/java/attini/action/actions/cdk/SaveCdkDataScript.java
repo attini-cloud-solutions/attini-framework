@@ -2,39 +2,29 @@ package attini.action.actions.cdk;
 
 public class SaveCdkDataScript {
 
-    public static final String SET_VARIABLE = """
-                       
-            ATTINI_SAVE_CDK_STACK_ITEM="{
-              \\"resourceType\\": {
-                \\"S\\": \\"CdkStack\\"
-              },
-              \\"name\\":{
-                \\"S\\": \\"__STACK_NAME__-${ATTINI_AWS_REGION}-${ATTINI_AWS_ACCOUNT}\\"
-              },
-              \\"attiniObjectIdentifier\\": {
-                \\"S\\": \\"${ATTINI_OBJECT_IDENTIFIER}\\"
-              },
-              \\"distributionId\\":{
-                \\"S\\": \\"${ATTINI_DISTRIBUTION_ID}\\"
-              },
-              \\"distributionName\\":{
-                \\"S\\": \\"${ATTINI_DISTRIBUTION_NAME}\\"
-              },
-              \\"environment\\":{
-                \\"S\\": \\"${ATTINI_ENVIRONMENT_NAME}\\"
-              },
-              \\"stackName\\":{
-                \\"S\\": \\"__STACK_NAME__\\"
-              },
-              \\"stepName\\":{
-                \\"S\\": \\"${ATTINI_STEP_NAME}\\"
-              }
-            }"
-            """;
     private static final String SAVE = """
-            $ATTINI_RUNNER_EXEC command-mode register-cdk-stacks \
+            $ATTINI_RUNNER_EXEC command-mode save-cdk-stacks \
                        "{\
-                        \\"requestType\\":\\"register-cdk-stacks\\",\
+                        \\"requestType\\":\\"save-cdk-stacks\\",\
+                        \\"objectIdentifier\\":\\"${ATTINI_OBJECT_IDENTIFIER}\\",\
+                        \\"distributionId\\":\\"${ATTINI_DISTRIBUTION_ID}\\",\
+                        \\"distributionName\\":\\"${ATTINI_DISTRIBUTION_NAME}\\",\
+                        \\"environment\\":\\"${ATTINI_ENVIRONMENT_NAME}\\",\
+                        \\"stepName\\":\\"${ATTINI_STEP_NAME}\\",\
+                        \\"stacks\\":$(%s)\
+                        }"
+            """;
+
+    public static String getFormatOutputScript(CdkCommandBuilder commandBuilder) {
+        return FORMAT_OUTPUT.formatted(commandBuilder.buildListCommand(),
+                              commandBuilder.getOutputFile());
+
+    }
+
+    private static final String FORMAT_OUTPUT = """
+            $ATTINI_RUNNER_EXEC command-mode format-cdk-output \
+                       "{\
+                        \\"requestType\\":\\"format-cdk-stacks-output\\",\
                         \\"objectIdentifier\\":\\"${ATTINI_OBJECT_IDENTIFIER}\\",\
                         \\"distributionId\\":\\"${ATTINI_DISTRIBUTION_ID}\\",\
                         \\"distributionName\\":\\"${ATTINI_DISTRIBUTION_NAME}\\",\
@@ -46,10 +36,11 @@ public class SaveCdkDataScript {
             """;
 
     public static String getSaveScript(CdkCommandBuilder commandBuilder) {
-        return SAVE.formatted(commandBuilder.buildListCommand(),
-                              commandBuilder.getOutputFile());
+        return SAVE.formatted(commandBuilder.buildListCommand());
 
     }
+
+
 
 }
 

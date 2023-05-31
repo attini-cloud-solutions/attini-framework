@@ -162,6 +162,20 @@ class CdkCommandBuilder {
         return "cdk deploy --outputs-file " +
                outputFile +
                " --progress events --require-approval never" +
+               " --app cdk.out" +
+               buildExcludes +
+               notificationArns +
+               force +
+               NO_COLOR +
+               roleArn +
+               plugins +
+               stackConfig +
+               context +
+               getStacksWithAllDefault();
+    }
+
+    public String buildSynthCommand() {
+        return "cdk synth --quiet" +
                appOption +
                buildCommand +
                buildExcludes +

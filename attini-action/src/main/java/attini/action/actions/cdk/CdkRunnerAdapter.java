@@ -32,11 +32,14 @@ public class CdkRunnerAdapter {
         CdkCommandBuilder cdkCommands = createCdkCommands(cdkInput.properties());
         String saveCommand = SaveCdkDataScript.getSaveScript(cdkCommands);
         String deployCommand = cdkCommands.buildDeployCommand();
+        String cdkSynthCommand = cdkCommands.buildSynthCommand();
         List<String> commands = List.of("cd " + cdkInput.properties().path(),
+                                        "echo  'Running cdk synth command: " + cdkSynthCommand + "'",
+                                        cdkSynthCommand,
+                                        saveCommand,
                                         "echo  'Running cdk deploy command: " + deployCommand + "'",
                                         deployCommand,
-                                        SaveCdkDataScript.SET_VARIABLE,
-                                        saveCommand);
+                                        SaveCdkDataScript.getFormatOutputScript(cdkCommands));
         RunnerProperties runnerProperties = new RunnerProperties(commands,
                                                                  cdkInput.properties().runner(),
                                                                  cdkInput.properties()
