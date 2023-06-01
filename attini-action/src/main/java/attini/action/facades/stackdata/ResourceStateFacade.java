@@ -34,7 +34,7 @@ public interface ResourceStateFacade {
 
     Optional<SfnExecutionArn> getStacksSfnExecutionArn(StackConfiguration stackConfiguration);
 
-    void saveToken(String sfnToken, StackConfiguration stackConfiguration);
+    void saveStackId(String stackId, StackConfiguration stackConfiguration);
 
     Optional<StackTemplate> getStackTemplate(StackConfiguration stackConfiguration);
 }

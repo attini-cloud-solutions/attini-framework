@@ -99,8 +99,8 @@ public class ResourceStateDynamoFacade implements ResourceStateFacade {
     public boolean acquireEcsStartLock(RunnerData runnerData) {
         String executionId = runnerData.getStartedByExecutionArn().map(SfnExecutionArn::extractExecutionId).orElse("");
         String conditionExpression = "attribute_not_exists(#taskStartedByExecution)" + runnerData.getStartedByExecutionArn()
-                                                                                                               .map(sfnExecutionArn -> " OR #taskStartedByExecution <> :v_executionId")
-                                                                                                               .orElse("");
+                                                                                                 .map(sfnExecutionArn -> " OR #taskStartedByExecution <> :v_executionId")
+                                                                                                 .orElse("");
         try {
             dynamoDbClient.updateItem(UpdateItemRequest.builder()
                                                        .tableName(environmentVariables.getResourceStatesTableName())
@@ -220,8 +220,10 @@ public class ResourceStateDynamoFacade implements ResourceStateFacade {
         inputMap.put("stackName", toStringUpdateAttribute(stackData.getStackConfiguration().getStackName()));
         inputMap.put("sfnExecutionArn",
                      toStringUpdateAttribute(stackData.getDeploymentPlanExecutionMetadata().executionArn().asString()));
+        inputMap.put("sfnToken", toStringUpdateAttribute(stackData.getDeploymentPlanExecutionMetadata().sfnToken()));
 
         inputMap.put("template", toStringUpdateAttribute(stackData.getStackConfiguration().getTemplate()));
+        inputMap.put("stackType", toStringUpdateAttribute("Cfn"));
         if (stackId != null) {
             inputMap.put("stackId",
                          toStringUpdateAttribute(stackId));
@@ -270,19 +272,15 @@ public class ResourceStateDynamoFacade implements ResourceStateFacade {
     }
 
     @Override
-    public void saveToken(String sfnToken, StackConfiguration stackConfiguration) {
+    public void saveStackId(String stackId, StackConfiguration stackConfiguration) {
 
-        logger.info("Setting new token");
-        Map<String, AttributeValueUpdate> placeholderQueue = new HashMap<>();
+        logger.info("Setting stack id");
 
-
-        placeholderQueue.put("sfnToken", AttributeValueUpdate.builder()
-                                                             .value(toStringAttribute(sfnToken))
-                                                             .build());
         dynamoDbClient.updateItem(UpdateItemRequest.builder()
                                                    .tableName(environmentVariables.getResourceStatesTableName())
                                                    .key(createStackDynamoKey(stackConfiguration))
-                                                   .attributeUpdates(placeholderQueue)
+                                                   .attributeUpdates(Map.of("stackId",
+                                                                            toStringUpdateAttribute(stackId)))
                                                    .build());
     }
 

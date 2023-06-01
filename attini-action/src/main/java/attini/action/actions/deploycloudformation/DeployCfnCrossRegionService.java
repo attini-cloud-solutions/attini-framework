@@ -60,8 +60,6 @@ public class DeployCfnCrossRegionService {
                 logger.info("New request for stack deletion received. Will delete stack");
                 cfnStackFacade.deleteStack(stackData);
                 resourceStateFacade.saveStackData(stackData);
-                resourceStateFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                              stackData.getStackConfiguration());
                 stepFunctionFacade.sendError(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
                                              "Is in progress",
                                              "IsExecuting");
@@ -71,9 +69,9 @@ public class DeployCfnCrossRegionService {
 
             if (isNewExecution(stackData)) {
                 logger.info("New request for stack update received. Will update stack");
+                resourceStateFacade.saveStackData(stackData);
                 String stackId = cfnStackFacade.updateStackCrossRegion(stackData);
-                resourceStateFacade.saveStackData(stackData, stackId);
-                resourceStateFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
+                resourceStateFacade.saveStackId(stackId,
                                               stackData.getStackConfiguration());
                 stepFunctionFacade.sendError(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
                                              "Is in progress",
@@ -94,8 +92,6 @@ public class DeployCfnCrossRegionService {
                         logger.info("No stack found. Will create the stack");
                         String stackId = cfnStackFacade.createStackCrossRegion(stackData);
                         resourceStateFacade.saveStackData(stackData, stackId);
-                        resourceStateFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                                      stackData.getStackConfiguration());
                         stepFunctionFacade.sendError(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
                                                      "Is in progress",
                                                      "IsExecuting");

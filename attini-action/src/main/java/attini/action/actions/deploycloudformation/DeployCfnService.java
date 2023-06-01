@@ -54,8 +54,6 @@ public class DeployCfnService {
             logger.info("Stack " + stackData.getStackConfiguration()
                                             .getStackName() + " is being deleted using callback strategy");
             resourceStateFacade.saveStackData(stackData);
-            resourceStateFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                          stackData.getStackConfiguration());
 
 
         } catch (CloudFormationException e) {
@@ -76,11 +74,9 @@ public class DeployCfnService {
 
     private void deployWithCallback(StackData stackData) {
         try {
+            resourceStateFacade.saveStackData(stackData);
             String stackId = cfnStackFacade.updateCfnStack(stackData);
-            resourceStateFacade.saveStackData(stackData, stackId);
-
-            resourceStateFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                          stackData.getStackConfiguration());
+            resourceStateFacade.saveStackId(stackId, stackData.getStackConfiguration());
 
         } catch (CloudFormationException e) {
             CloudFormationError cloudFormationError = resolveError(e);
@@ -113,12 +109,9 @@ public class DeployCfnService {
     private void createStack(StackData stackData) {
 
         try {
+            resourceStateFacade.saveStackData(stackData);
             String stackId = cfnStackFacade.createCfnStack(stackData);
-            resourceStateFacade.saveStackData(stackData, stackId);
-
-            resourceStateFacade.saveToken(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
-                                          stackData.getStackConfiguration());
-
+            resourceStateFacade.saveStackId(stackId, stackData.getStackConfiguration());
         } catch (AlreadyExistsException e) {
             stepFunctionFacade.sendError(stackData.getDeploymentPlanExecutionMetadata().sfnToken(),
                                          "Attini can not update stack with name=" + stackData.getStackConfiguration()

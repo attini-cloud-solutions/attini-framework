@@ -38,9 +38,9 @@ public class EcsFacade {
 
     private static final Logger logger = Logger.getLogger(EcsFacade.class);
 
-    private static final String RUNNER_VERSION = "2.0.1";
+    private static final String RUNNER_VERSION = "2.0.2";
 
-    private static final String RUNNER_REQUIRED_VERSION = "2.0.1";
+    private static final String RUNNER_REQUIRED_VERSION = "2.0.2";
 
     private final EcsClient ecsClient;
     private final EnvironmentVariables environmentVariables;

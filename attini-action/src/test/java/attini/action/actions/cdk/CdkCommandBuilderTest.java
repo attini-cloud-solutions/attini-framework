@@ -19,22 +19,29 @@ class CdkCommandBuilderTest {
     @Test
     void ShouldCreateDeployCommand() {
         String commandString = CdkCommandBuilder.builder(null, OUTPUT_FILE).buildDeployCommand();
-        assertEquals("cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --no-color --all", commandString);
+        assertEquals("cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app cdk.out --no-color --all", commandString);
     }
+
+    @Test
+    void ShouldCreateSynthCommand() {
+        String commandString = CdkCommandBuilder.builder(null, OUTPUT_FILE).buildSynthCommand();
+        assertEquals("cdk synth --quiet --no-color --all", commandString);
+    }
+
 
     @Test
     void ShouldCreateDeployAndListCommand_shouldAddApps() {
         CdkCommandBuilder builder = CdkCommandBuilder.builder(List.of("test1", "test2"), OUTPUT_FILE);
-        assertEquals("cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --no-color test1 test2", builder.buildDeployCommand());
+        assertEquals("cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app cdk.out --no-color test1 test2", builder.buildDeployCommand());
         assertEquals("cdk ls --long --json --no-color --app cdk.out test1 test2", builder.buildListCommand());
 
     }
 
     @Test
-    void ShouldCreateDeployCommand_shouldAddBuild() {
+    void ShouldCreateSynthCommand_shouldAddBuild() {
 
-        String commandString = CdkCommandBuilder.builder(null, OUTPUT_FILE).addBuild("npm install").buildDeployCommand();
-        assertEquals("cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --build \"npm install\" --no-color --all", commandString);
+        String commandString = CdkCommandBuilder.builder(null, OUTPUT_FILE).addBuild("npm install").buildSynthCommand();
+        assertEquals("cdk synth --quiet --build \"npm install\" --no-color --all", commandString);
     }
 
 
@@ -49,7 +56,7 @@ class CdkCommandBuilderTest {
                                                 .addStackConfig(stackConfiguration)
                                                 .buildDeployCommand();
         assertEquals(
-                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --no-color --parameters MyStack:MyParam=MyParamValue --parameters MyStack:MySecondParam=MySecondParamValue --all",
+                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app cdk.out --no-color --parameters MyStack:MyParam=MyParamValue --parameters MyStack:MySecondParam=MySecondParamValue --all",
                 commandString);
     }
 
@@ -64,7 +71,7 @@ class CdkCommandBuilderTest {
                                                 .addStackConfig(stackConfiguration)
                                                 .buildDeployCommand();
         assertEquals(
-                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --no-color --parameters MyParam=MyParamValue --parameters MySecondParam=MySecondParamValue --all",
+                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app cdk.out --no-color --parameters MyParam=MyParamValue --parameters MySecondParam=MySecondParamValue --all",
                 commandString);
     }
 
@@ -88,7 +95,7 @@ class CdkCommandBuilderTest {
         String commandString = CdkCommandBuilder.builder(null, OUTPUT_FILE)
                                                 .addContext(context)
                                                 .buildDeployCommand();
-        assertEquals("cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --no-color --context key1=value1 --context key2=value2 --all",
+        assertEquals("cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app cdk.out --no-color --context key1=value1 --context key2=value2 --all",
                      commandString);
     }
 
@@ -98,7 +105,7 @@ class CdkCommandBuilderTest {
         String commandString = CdkCommandBuilder.builder(null, OUTPUT_FILE)
                                                 .addApp("AppName")
                                                 .buildDeployCommand();
-        assertEquals("cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app AppName --no-color --all", commandString);
+        assertEquals("cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app cdk.out --no-color --all", commandString);
     }
 
     @Test
@@ -115,7 +122,7 @@ class CdkCommandBuilderTest {
                                                 .addPlugins(List.of("plugin1", "plugin2"))
                                                 .buildDeployCommand();
         assertEquals(
-                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app AppName --no-color --plugin plugin1 --plugin plugin2 --all",
+                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app cdk.out --no-color --plugin plugin1 --plugin plugin2 --all",
                 commandString);
     }
 
@@ -127,7 +134,7 @@ class CdkCommandBuilderTest {
                                                                .addBuildExclude(List.of("exclude1", "exclude2"));
 
         assertEquals(
-                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app AppName --build-exclude exclude1 --build-exclude exclude2 --no-color --all",
+                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app cdk.out --build-exclude exclude1 --build-exclude exclude2 --no-color --all",
                 commandsBuilder
                         .buildDeployCommand());
 
@@ -145,7 +152,7 @@ class CdkCommandBuilderTest {
                                                              .addNotificationArns(List.of("arn1", "arn2"));
 
         assertEquals(
-                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app AppName --notification-arns arn1 --notification-arns arn2 --no-color --all",
+                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app cdk.out --notification-arns arn1 --notification-arns arn2 --no-color --all",
                 commandsBuilder
                         .buildDeployCommand());
 
@@ -163,7 +170,7 @@ class CdkCommandBuilderTest {
                                                              .addForce(true);
 
         assertEquals(
-                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app AppName --force --no-color --all",
+                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app cdk.out --force --no-color --all",
                 commandsBuilder
                         .buildDeployCommand());
 
@@ -181,7 +188,7 @@ class CdkCommandBuilderTest {
                                                              .addRoleArn("some-arn");
 
         assertEquals(
-                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app AppName --no-color --role-arn some-arn --all",
+                "cdk deploy --outputs-file "+OUTPUT_FILE+" --progress events --require-approval never --app cdk.out --no-color --role-arn some-arn --all",
                 commandsBuilder
                         .buildDeployCommand());
 
