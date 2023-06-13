@@ -61,7 +61,7 @@ public class Poller <V> {
 
         private Supplier<RuntimeException> timeoutExceptionSupplier;
 
-        Supplier<PollingResult<V>> action;
+        private final Supplier<PollingResult<V>> action;
 
         private Builder(Supplier<PollingResult<V>> action) {
             this.action = action;

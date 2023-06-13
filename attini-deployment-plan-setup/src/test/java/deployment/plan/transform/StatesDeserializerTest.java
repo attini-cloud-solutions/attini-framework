@@ -20,7 +20,7 @@ class StatesDeserializerTest {
     ObjectMapper objectMapper;
 
 
-    String STATES = """
+    final static String STATES = """
             {"states" : {
                 "SamStrudle": {
                     "Type": "AttiniSam",
