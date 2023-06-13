@@ -5,10 +5,12 @@
 
 package attini.domain;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -26,6 +28,10 @@ public class DeployOriginData {
     private final String stackName;
     private final Map<String, String> distributionTags;
     private final Version version;
+
+    private final Map<String, String> executionArns;
+
+    //TODO can remove?
     private final boolean samPackaged;
 
 
@@ -40,7 +46,8 @@ public class DeployOriginData {
                             @JsonProperty("stackName") String stackName,
                             @JsonProperty("distributionTags") Map<String, String> distributionTags,
                             @JsonProperty("version") Version version,
-                            @JsonProperty("samPackaged") boolean samPackaged) {
+                            @JsonProperty("samPackaged") boolean samPackaged,
+                            @JsonProperty("executionArns") Map<String, String> executionArns) {
 
         this.distributionName = distributionName;
         this.deployTimeInEpoch = deployTimeInEpoch;
@@ -53,6 +60,7 @@ public class DeployOriginData {
         this.distributionTags = distributionTags;
         this.version = version;
         this.samPackaged = samPackaged;
+        this.executionArns = executionArns;
     }
 
     private DeployOriginData(Builder builder) {
@@ -67,6 +75,7 @@ public class DeployOriginData {
         distributionTags = builder.distributionTags;
         version = builder.version;
         samPackaged = builder.samPackaged;
+        executionArns = builder.executionArns;
     }
 
     public static Builder builder() {
@@ -130,6 +139,11 @@ public class DeployOriginData {
         return samPackaged;
     }
 
+    @JsonIgnore
+    @JsonProperty("executionArns")
+    public Map<String, String> getExecutionArns() {
+        return executionArns == null ? Collections.emptyMap() : executionArns;
+    }
 
     @Override
     public String toString() {
@@ -144,6 +158,7 @@ public class DeployOriginData {
                ", stackName='" + stackName + '\'' +
                ", distributionTags=" + distributionTags +
                ", version=" + version +
+               ", executionArns=" + executionArns +
                ", samPackaged=" + samPackaged +
                '}';
     }
@@ -196,6 +211,8 @@ public class DeployOriginData {
         private Version version;
 
         private boolean samPackaged;
+
+        private Map<String, String> executionArns;
 
         private Builder() {
         }
@@ -252,6 +269,11 @@ public class DeployOriginData {
 
         public Builder samPackaged(boolean val) {
             samPackaged = val;
+            return this;
+        }
+
+        public Builder executionArns(Map<String, String> val){
+            executionArns = val;
             return this;
         }
 

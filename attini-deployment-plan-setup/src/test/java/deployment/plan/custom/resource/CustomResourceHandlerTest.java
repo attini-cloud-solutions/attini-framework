@@ -24,8 +24,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import deployment.plan.custom.resource.service.AppDeploymentService;
 import deployment.plan.custom.resource.service.RegisterDeployOriginDataRequest;
 import deployment.plan.custom.resource.service.RegisterDeployOriginDataService;
 import deployment.plan.custom.resource.service.RegisterDeploymentPlanTriggerService;
@@ -45,6 +47,9 @@ class CustomResourceHandlerTest {
     @Mock
     Context context;
 
+    @Mock
+    AppDeploymentService appDeploymentService;
+
 
     CustomResourceHandler customResourceHandler;
 
@@ -52,12 +57,13 @@ class CustomResourceHandlerTest {
     void setUp() {
         customResourceHandler = new CustomResourceHandler(registerDeploymentPlanTriggerService,
                                                           registerDeployOriginDataService,
-                                                          responseSender, new ObjectMapper());
+                                                          responseSender, new ObjectMapper(),
+                                                          appDeploymentService);
     }
 
     @Test
     public void handleCustomResource_shouldSendSuccessIfDeleteUnknownResource() throws IOException {
-        Map<String, Object> input = getInput("delete-resource.json");
+        JsonNode input = getInput("delete-resource.json");
         customResourceHandler.handleCustomResource(input, context);
         ArgumentCaptor<CfnResponse> cfnResponseArgumentCaptor = ArgumentCaptor.forClass(CfnResponse.class);
         verify(responseSender).sendResponse(anyString(), cfnResponseArgumentCaptor.capture());
@@ -67,7 +73,7 @@ class CustomResourceHandlerTest {
 
     @Test
     public void handleCustomResource_shouldSendFailedIfUpdateUnknownResource() throws IOException {
-        Map<String, Object> input = getInput("update-unknown-resource.json");
+        JsonNode input = getInput("update-unknown-resource.json");
         customResourceHandler.handleCustomResource(input, context);
         ArgumentCaptor<CfnResponse> cfnResponseArgumentCaptor = ArgumentCaptor.forClass(CfnResponse.class);
         verify(responseSender).sendResponse(anyString(), cfnResponseArgumentCaptor.capture());
@@ -77,7 +83,7 @@ class CustomResourceHandlerTest {
 
     @Test
     public void handleCustomResource_shouldRegisterDeployPlan() throws IOException {
-        Map<String, Object> input = getInput("create-deploy-plan-resource.json");
+        JsonNode input = getInput("create-deploy-plan-resource.json");
         customResourceHandler.handleCustomResource(input, context);
         ArgumentCaptor<CfnResponse> cfnResponseArgumentCaptor = ArgumentCaptor.forClass(CfnResponse.class);
         verify(registerDeploymentPlanTriggerService).registerDeploymentPlanTrigger(input, CfnRequestType.CREATE);
@@ -89,7 +95,7 @@ class CustomResourceHandlerTest {
 
     @Test
     public void handleCustomResource_shouldRegisterDeployPlanOnUpdate() throws IOException {
-        Map<String, Object> input = getInput("update-deploy-plan-resource.json");
+        JsonNode input = getInput("update-deploy-plan-resource.json");
         customResourceHandler.handleCustomResource(input, context);
         ArgumentCaptor<CfnResponse> cfnResponseArgumentCaptor = ArgumentCaptor.forClass(CfnResponse.class);
         verify(registerDeploymentPlanTriggerService).registerDeploymentPlanTrigger(input, CfnRequestType.UPDATE);
@@ -99,10 +105,9 @@ class CustomResourceHandlerTest {
         assertEquals("SUCCESS", status);
     }
 
-    private Map<String, Object> getInput(String fileName) throws IOException {
+    private JsonNode getInput(String fileName) throws IOException {
         Path inputFilePath = Paths.get("src", "test", "resources", "custom-resource", fileName);
         ObjectMapper objectMapper = new ObjectMapper();
-        return objectMapper.readValue(inputFilePath.toFile(), new TypeReference<>() {
-        });
+        return objectMapper.readTree(inputFilePath.toFile());
     }
 }

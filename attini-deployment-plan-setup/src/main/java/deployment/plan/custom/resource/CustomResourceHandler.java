@@ -5,22 +5,33 @@
 
 package deployment.plan.custom.resource;
 
+import static deployment.plan.custom.resource.StackType.APP;
+import static deployment.plan.custom.resource.StackType.INFRA;
 import static java.util.Objects.requireNonNull;
 
+import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.jboss.logging.Logger;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import deployment.plan.custom.resource.service.AppDeploymentService;
 import deployment.plan.custom.resource.service.RegisterDeployOriginDataRequest;
 import deployment.plan.custom.resource.service.RegisterDeployOriginDataService;
 import deployment.plan.custom.resource.service.RegisterDeploymentPlanTriggerService;
+import deployment.plan.transform.Runner;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 
 public class CustomResourceHandler {
@@ -38,64 +49,45 @@ public class CustomResourceHandler {
     private final RegisterDeployOriginDataService registerDeployOriginDataService;
     private final CfnResponseSender responseSender;
     private final ObjectMapper objectMapper;
+    private final AppDeploymentService appDeploymentService;
 
 
     public CustomResourceHandler(RegisterDeploymentPlanTriggerService registerDeploymentPlanTriggerService,
                                  RegisterDeployOriginDataService registerDeployOriginDataService,
                                  CfnResponseSender responseSender,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper, AppDeploymentService appDeploymentService) {
         this.registerDeploymentPlanTriggerService = requireNonNull(registerDeploymentPlanTriggerService,
                                                                    "registerDeploymentPlanTrigger");
         this.registerDeployOriginDataService = requireNonNull(registerDeployOriginDataService,
                                                               "registerDeployOriginData");
         this.responseSender = requireNonNull(responseSender, "responseSender");
-        this.objectMapper = objectMapper;
+        this.objectMapper = requireNonNull(objectMapper, "objectMapper");
+        this.appDeploymentService = requireNonNull(appDeploymentService, "appDeploymentService");
     }
 
-    public void handleCustomResource(Map<String, Object> input, Context context) {
+    public void handleCustomResource(JsonNode inputJson, Context context) {
 
 
         try {
-            String inputString = objectMapper.writeValueAsString(input);
-            ObjectNode inputJson = objectMapper.readTree(inputString).deepCopy();
 
-            if (isDeploymentPlanCustomResource(input)) {
-                registerDeploymentPlan(input, context, inputJson);
-            } else if (isDeleteCustomResource(input)) {
+            if (isDeploymentPlanCustomResource(inputJson)) {
+                registerDeploymentPlan(inputJson);
+            } else if (isAppDeploymentPlanCustomResource(inputJson)) {
+                registerAppDeploymentPlan(inputJson);
+            } else if (isDeleteCustomResource(inputJson)) {
                 responseSender
-                        .sendResponse(input.get(RESPONSE_URL).toString(),
+                        .sendResponse(inputJson.get(RESPONSE_URL).asText(),
                                       createSuccessResponse(inputJson));
             } else {
                 responseSender
-                        .sendResponse(input.get(RESPONSE_URL).toString(),
+                        .sendResponse(inputJson.get(RESPONSE_URL).asText(),
                                       createFailResponse(inputJson,
                                                          String.format(
                                                                  "Could not process request to unknown custom resource = %s, sending failed response",
-                                                                 input.get(RESOURCE_TYPE))));
+                                                                 inputJson.path(RESOURCE_TYPE).asText())));
 
             }
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Could not parse input string", e);
-        }
-
-
-    }
-
-    private void registerDeploymentPlan(Map<String, Object> input,
-                                        Context context,
-                                        ObjectNode inputJson) {
-
-
-        CfnRequestType requestType = getRequestType(inputJson);
-        try {
-            validateInput(inputJson);
-            registerDeploymentPlanTriggerService.registerDeploymentPlanTrigger(input, requestType);
-            registerDeployOriginDataService
-                    .registerDeployOriginData(toRegisterDeployOriginRequest(input, requestType));
-
-            responseSender.sendResponse(inputJson.get(RESPONSE_URL).asText(),
-                                        createSuccessResponse(inputJson));
-        }catch (IllegalArgumentException e){
+        } catch (IllegalArgumentException e) {
             logger.error("Illegal argument", e);
             responseSender.sendResponse(inputJson.get(RESPONSE_URL).asText(),
                                         createFailResponse(inputJson, e.getMessage()));
@@ -113,45 +105,86 @@ public class CustomResourceHandler {
             responseSender.sendResponse(inputJson.get(RESPONSE_URL).asText(),
                                         createFailResponse(inputJson, reason));
         }
+
     }
 
-    @SuppressWarnings("unchecked")
-    private RegisterDeployOriginDataRequest toRegisterDeployOriginRequest(Map<String, Object> input,
-                                                                                 CfnRequestType requestType) {
-        Map<String, Object> resourceProperties = (Map<String, Object>) input.get("ResourceProperties");
+    private void registerAppDeploymentPlan(JsonNode inputJson) {
+        validateInput(inputJson);
+        RegisterDeployOriginDataRequest registerDeployOriginRequest = toRegisterDeployOriginRequest(inputJson);
+        String appPipelineName = inputJson.path("ResourceProperties").path("AppPipelineName").asText();
+        appDeploymentService.saveAppDeploymentState(registerDeployOriginRequest, appPipelineName);
+        responseSender.sendResponse(inputJson.get(RESPONSE_URL).asText(),
+                                    createSuccessResponse(inputJson));
+    }
+
+    private void registerDeploymentPlan(JsonNode inputJson) {
+
+        validateInput(inputJson);
+        RegisterDeployOriginDataRequest registerDeployOriginRequest = toRegisterDeployOriginRequest(inputJson);
+        registerDeploymentPlanTriggerService
+                .registerDeploymentPlanTrigger(inputJson, registerDeployOriginRequest.getCfnRequestType());
+        registerDeployOriginDataService
+                .registerDeployOriginData(registerDeployOriginRequest);
+
+
+        responseSender.sendResponse(inputJson.get(RESPONSE_URL).asText(),
+                                    createSuccessResponse(inputJson));
+
+    }
+
+    private RegisterDeployOriginDataRequest toRegisterDeployOriginRequest(JsonNode input) {
+        JsonNode resourceProperties = input.get("ResourceProperties");
 
 
         RegisterDeployOriginDataRequest.Builder builder = RegisterDeployOriginDataRequest.builder();
 
-        if (resourceProperties.containsKey("Runners")){
-            builder.runners(objectMapper.convertValue(resourceProperties.get("Runners"), new TypeReference<>() {
-            }));
+        if (!resourceProperties.path("Runners").isMissingNode()) {
+            builder.runners(toRunners(resourceProperties.get("Runners")));
 
         }
-        if (resourceProperties.containsKey("Parameters")){
-            builder.parameters(objectMapper.convertValue(resourceProperties.get("Parameters"), new TypeReference<>() {
-            }));
+        if (!resourceProperties.path("Parameters").isMissingNode()) {
+
+            builder.parameters(toMap(resourceProperties.get("Parameters"), String.class));
         }
 
-        if (resourceProperties.containsKey("PayloadDefaults")){
-            builder.payloadDefaults(objectMapper.convertValue(resourceProperties.get("PayloadDefaults"), new TypeReference<>() {
-            }));
+        if (!resourceProperties.path("PayloadDefaults").isMissingNode()) {
+            builder.payloadDefaults(toMap(resourceProperties.get("PayloadDefaults"), Object.class));
         }
 
-        if (requestType == CfnRequestType.UPDATE) {
-            Map<String, Object> oldResourceProperties = (Map<String, Object>) input.get("OldResourceProperties");
-            builder.oldSfnArn((String) oldResourceProperties.get("SfnArn"));
+        JsonNode oldSfnArn = input.path("OldResourceProperties").path("SfnArn");
+        if (!oldSfnArn.isMissingNode()) {
+            builder.oldSfnArn(oldSfnArn.asText());
         }
 
-        return builder.stackName((String) resourceProperties.get(STACK_NAME))
-                      .stepFunctionLogicalId((String) resourceProperties.get("DeploymentPlanLogicalName"))
-                      .cfnRequestType(requestType)
-                      .newSfnArn((String) resourceProperties.get("SfnArn"))
+        return builder.stackName(resourceProperties.get(STACK_NAME).textValue())
+                      .stepFunctionLogicalId(resourceProperties.path("DeploymentPlanLogicalName").textValue())
+                      .cfnRequestType(getRequestType(input))
+                      .newSfnArn(resourceProperties.get("SfnArn").asText())
                       .build();
     }
 
+    private List<Runner> toRunners(JsonNode node) {
+        try {
+            return objectMapper.treeToValue(node,
+                                            objectMapper.getTypeFactory()
+                                                        .constructCollectionType(ArrayList.class, Runner.class));
+        } catch (JsonProcessingException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
 
-    private static CfnResponse createSuccessResponse(ObjectNode input) {
+    private <T> Map<String, T> toMap(JsonNode node, Class<T> valueType) {
+        try {
+            return objectMapper.treeToValue(node,
+                                            objectMapper.getTypeFactory()
+                                                        .constructMapType(HashMap.class, String.class, valueType));
+        } catch (JsonProcessingException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+
+    private static CfnResponse createSuccessResponse(JsonNode input) {
         return CfnResponse.builder()
                           .setStatus("SUCCESS")
                           .setStackId(input.get(STACK_ID).asText())
@@ -162,7 +195,7 @@ public class CustomResourceHandler {
                           .build();
     }
 
-    private static CfnResponse createFailResponse(ObjectNode input, String reason) {
+    private static CfnResponse createFailResponse(JsonNode input, String reason) {
         return CfnResponse.builder()
                           .setStatus("FAILED")
                           .setStackId(input.get(STACK_ID).asText())
@@ -174,7 +207,7 @@ public class CustomResourceHandler {
     }
 
 
-    private static void validateInput(ObjectNode inputJson) {
+    private static void validateInput(JsonNode inputJson) {
         try {
             new URL(inputJson.get(RESPONSE_URL).asText());
         } catch (MalformedURLException e) {
@@ -184,7 +217,7 @@ public class CustomResourceHandler {
         }
     }
 
-    private static CfnRequestType getRequestType(ObjectNode input) {
+    private static CfnRequestType getRequestType(JsonNode input) {
         if (input.has(REQUEST_TYPE)) {
             return switch (input.get(REQUEST_TYPE).asText()) {
                 case "Create" -> CfnRequestType.CREATE;
@@ -201,15 +234,20 @@ public class CustomResourceHandler {
     }
 
 
-    private static boolean isDeleteCustomResource(Map<String, Object> input) {
-        return input.containsKey(REQUEST_TYPE) && input.get(REQUEST_TYPE)
-                                                       .equals("Delete");
+    private static boolean isDeleteCustomResource(JsonNode input) {
+        return !input.path(RESOURCE_TYPE).isMissingNode() && input.get(REQUEST_TYPE).textValue()
+                                                                  .equals("Delete");
     }
 
 
-    private static boolean isDeploymentPlanCustomResource(Map<String, Object> input) {
-        return input.containsKey(RESOURCE_TYPE) && input.get(RESOURCE_TYPE)
-                                                        .equals("Custom::AttiniDeploymentPlanTrigger");
+    private static boolean isDeploymentPlanCustomResource(JsonNode input) {
+        return !input.path(RESOURCE_TYPE).isMissingNode() && input.get(RESOURCE_TYPE).textValue()
+                                                                  .equals("Custom::AttiniDeploymentPlanTrigger");
+    }
+
+    private static boolean isAppDeploymentPlanCustomResource(JsonNode input) {
+        return !input.path(RESOURCE_TYPE).isMissingNode() && input.get(RESOURCE_TYPE).textValue()
+                                                                  .equals("Custom::AttiniAppDeploymentPlanTrigger");
     }
 
 }

@@ -19,6 +19,10 @@ import org.jboss.logging.Logger;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import attini.domain.DistributionId;
+import attini.domain.DistributionName;
+import attini.domain.Environment;
+import attini.domain.ObjectIdentifier;
 import deployment.plan.system.EnvironmentVariables;
 import deployment.plan.transform.CfnString;
 import deployment.plan.transform.Runner;
@@ -48,18 +52,17 @@ public class DeployStatesFacade {
     }
 
     public void saveDeploymentPlanState(DeploymentPlanResourceState deploymentPlanResourceState) {
-        logger.info(deploymentPlanResourceState);
         Map<String, AttributeValue> item = new HashMap<>();
         item.put("resourceType", AttributeValue.builder().s("DeploymentPlan").build());
         item.put("name", AttributeValue.builder().s(deploymentPlanResourceState.getSfnArn()).build());
         item.put("environment",
-                 AttributeValue.builder().s(deploymentPlanResourceState.getAttiniEnvironmentName()).build());
+                 AttributeValue.builder().s(deploymentPlanResourceState.getEnvironment().asString()).build());
         item.put("distributionName",
-                 AttributeValue.builder().s(deploymentPlanResourceState.getAttiniDistributionName()).build());
+                 AttributeValue.builder().s(deploymentPlanResourceState.getDistributionName().asString()).build());
         item.put("attiniObjectIdentifier",
-                 AttributeValue.builder().s(deploymentPlanResourceState.getAttiniObjectIdentifier()).build());
+                 AttributeValue.builder().s(deploymentPlanResourceState.getObjectIdentifier().asString()).build());
         item.put("distributionId",
-                 AttributeValue.builder().s(deploymentPlanResourceState.getAttiniDistributionId()).build());
+                 AttributeValue.builder().s(deploymentPlanResourceState.getDistributionId().asString()).build());
         item.put("stackName", AttributeValue.builder().s(deploymentPlanResourceState.getStackName()).build());
         try {
             item.put("payloadDefaults",
@@ -101,15 +104,15 @@ public class DeployStatesFacade {
 
         Map<String, AttributeValueUpdate> map = new HashMap<>();
         map.put("environment", stringUpdateAttribute(
-                deploymentPlanResourceState.getAttiniEnvironmentName()));
+                deploymentPlanResourceState.getEnvironment().asString()));
         map.put("attiniObjectIdentifier", stringUpdateAttribute(
-                deploymentPlanResourceState.getAttiniObjectIdentifier()));
+                deploymentPlanResourceState.getObjectIdentifier().asString()));
         map.put("container", updateNullableCfnString(runner.getContainerName(), "ContainerName"));
         map.put("roleArn", updateNullableCfnString(runner.getRoleArn(), "RoleArn"));
         map.put("distributionId", stringUpdateAttribute(
-                deploymentPlanResourceState.getAttiniDistributionId()));
+                deploymentPlanResourceState.getDistributionId().asString()));
         map.put("distributionName", stringUpdateAttribute(
-                deploymentPlanResourceState.getAttiniDistributionName()));
+                deploymentPlanResourceState.getDistributionName().asString()));
         map.put("runnerName", stringUpdateAttribute(runner.getName()));
         map.put("stackName", stringUpdateAttribute(
                 deploymentPlanResourceState.getStackName()));
@@ -294,21 +297,34 @@ public class DeployStatesFacade {
                                    .build();
     }
 
-    public InitStackResourceState getInitStackState(String stackName) {
+    public StackResourceState getInitStackState(String stackName) {
         Map<String, AttributeValue> item = dynamoDbClient.getItem(GetItemRequest.builder()
                                                                                 .tableName(environmentVariables.getResourceStatesTableName())
-                                                                                .key(createTriggerDynamoKey(stackName))
+                                                                                .key(createInitStackDynamoKey(stackName))
                                                                                 .build()).item();
-        return InitStackResourceState.builder()
-                                     .setDistributionId(item.get("distributionId").s())
-                                     .setDistributionName(item.get("distributionName").s())
-                                     .setEnvironment(item.get("environment").s())
-                                     .setObjectIdentifier(item.get("attiniObjectIdentifier").s())
-                                     .build();
+        return StackResourceState.builder()
+                                 .setDistributionId(DistributionId.of(item.get("distributionId").s()))
+                                 .setDistributionName(DistributionName.of(item.get("distributionName").s()))
+                                 .setEnvironment(Environment.of(item.get("environment").s()))
+                                 .setObjectIdentifier(ObjectIdentifier.of(item.get("attiniObjectIdentifier").s()))
+                                 .build();
+    }
+
+    public StackResourceState getStackState(String stackName) {
+        Map<String, AttributeValue> item = dynamoDbClient.getItem(GetItemRequest.builder()
+                                                                                .tableName(environmentVariables.getResourceStatesTableName())
+                                                                                .key(createStackDynamoKey(stackName))
+                                                                                .build()).item();
+        return StackResourceState.builder()
+                                 .setDistributionId(DistributionId.of(item.get("distributionId").s()))
+                                 .setDistributionName(DistributionName.of(item.get("distributionName").s()))
+                                 .setEnvironment(Environment.of(item.get("environment").s()))
+                                 .setObjectIdentifier(ObjectIdentifier.of(item.get("attiniObjectIdentifier").s()))
+                                 .build();
     }
 
     public void deleteDeploymentPlanState(String sfnArn) {
-        logger.info("Deleting OriginDeployDataLink");
+        logger.info("Deleting old sfn arn: " + sfnArn);
         try {
             dynamoDbClient.deleteItem(DeleteItemRequest.builder()
                                                        .tableName(environmentVariables.getResourceStatesTableName())
@@ -331,16 +347,45 @@ public class DeployStatesFacade {
     public void removeErrors(String stackName) {
         dynamoDbClient.updateItem(UpdateItemRequest.builder()
                                                    .tableName(environmentVariables.getResourceStatesTableName())
-                                                   .key(createTriggerDynamoKey(stackName))
+                                                   .key(createInitStackDynamoKey(stackName))
                                                    .updateExpression("Remove stackError")
                                                    .build());
+    }
+
+    public void saveAppDeploymentData(DeploymentPlanResourceState deploymentPlanResourceState, String name) {
+        dynamoDbClient.putItem(PutItemRequest.builder()
+                                             .tableName(environmentVariables.getResourceStatesTableName())
+                                             .item(Map.of(
+                                                     "resourceType",
+                                                     AttributeValue
+                                                             .builder()
+                                                             .s("AppDeploymentPlan")
+                                                             .build(),
+                                                     "name",
+                                                     AttributeValue.builder()
+                                                                   .s("%s-%s".formatted(deploymentPlanResourceState.getEnvironment().asString(), name))
+                                                                   .build(),
+                                                     "distributionId",
+                                                     AttributeValue.builder().s(deploymentPlanResourceState.getDistributionId().asString()).build(),
+                                                     "distributionName",
+                                                     AttributeValue.builder().s(deploymentPlanResourceState.getDistributionName().asString()).build(),
+                                                     "environment",
+                                                     AttributeValue.builder().s(deploymentPlanResourceState.getEnvironment().asString()).build(),
+                                                     "attiniObjectIdentifier",
+                                                     AttributeValue.builder().s(deploymentPlanResourceState.getObjectIdentifier().asString()).build(),
+                                                     "sfnArn",
+                                                     AttributeValue.builder().s(deploymentPlanResourceState.getSfnArn()).build(),
+                                                     "stackName",
+                                                     AttributeValue.builder().s(deploymentPlanResourceState.getStackName()).build()
+                                                     ))
+                                             .build());
     }
 
     public void saveSfnTrigger(String sfnArn, String stackName) {
         logger.info("Saving sfn arn: " + sfnArn);
         dynamoDbClient.updateItem(UpdateItemRequest.builder()
                                                    .tableName(environmentVariables.getResourceStatesTableName())
-                                                   .key(createTriggerDynamoKey(stackName))
+                                                   .key(createInitStackDynamoKey(stackName))
                                                    .updateExpression("Add sfnArns :val")
                                                    .expressionAttributeValues(Map.of(":val",
                                                                                      AttributeValue.builder()
@@ -355,7 +400,7 @@ public class DeployStatesFacade {
         if (!runnerName.isEmpty()) {
             dynamoDbClient.updateItem(UpdateItemRequest.builder()
                                                        .tableName(environmentVariables.getResourceStatesTableName())
-                                                       .key(createTriggerDynamoKey(stackName))
+                                                       .key(createInitStackDynamoKey(stackName))
                                                        .updateExpression(
                                                                "ADD runners :runners SET stackParameters = :params")
                                                        .expressionAttributeValues(Map.of(":runners",
@@ -378,7 +423,7 @@ public class DeployStatesFacade {
         } else {
             dynamoDbClient.updateItem(UpdateItemRequest.builder()
                                                        .tableName(environmentVariables.getResourceStatesTableName())
-                                                       .key(createTriggerDynamoKey(stackName))
+                                                       .key(createInitStackDynamoKey(stackName))
                                                        .updateExpression("SET stackParameters = :params")
                                                        .expressionAttributeValues(Map.of(":params",
                                                                                          AttributeValue.builder()
@@ -401,7 +446,7 @@ public class DeployStatesFacade {
         logger.info("Deleting sfn arn: " + sfnArn);
         dynamoDbClient.updateItem(UpdateItemRequest.builder()
                                                    .tableName(environmentVariables.getResourceStatesTableName())
-                                                   .key(createTriggerDynamoKey(stackName))
+                                                   .key(createInitStackDynamoKey(stackName))
                                                    .updateExpression("DELETE sfnArns :val")
                                                    .expressionAttributeValues(Map.of(":val",
                                                                                      AttributeValue.builder()
@@ -411,10 +456,19 @@ public class DeployStatesFacade {
     }
 
 
-    private Map<String, AttributeValue> createTriggerDynamoKey(String stackName) {
+    private Map<String, AttributeValue> createInitStackDynamoKey(String stackName) {
         return Map.of(
                 "resourceType", AttributeValue.builder().s("InitDeployCloudformationStack").build(),
                 "name", AttributeValue.builder().s(stackName).build());
     }
+
+    private Map<String, AttributeValue> createStackDynamoKey(String stackName) {
+        return Map.of(
+                "resourceType", AttributeValue.builder().s("CloudformationStack").build(),
+                "name", AttributeValue.builder().s("%s-%s-%s".formatted(stackName,
+                                                                        environmentVariables.getRegion(),
+                                                                        environmentVariables.getAccount())).build());
+    }
+
 
 }

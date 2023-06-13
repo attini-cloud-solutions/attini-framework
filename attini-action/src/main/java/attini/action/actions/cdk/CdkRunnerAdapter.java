@@ -51,7 +51,8 @@ public class CdkRunnerAdapter {
                                              cdkInput.deployOriginData(),
                                              cdkInput.dependencies(),
                                              cdkInput.customData(),
-                                             cdkInput.stackParameters()));
+                                             cdkInput.stackParameters(),
+                                             cdkInput.customData()));
 
     }
 
@@ -82,7 +83,8 @@ public class CdkRunnerAdapter {
                                              cdkInput.deployOriginData(),
                                              cdkInput.dependencies(),
                                              cdkInput.customData(),
-                                             cdkInput.stackParameters()));
+                                             cdkInput.stackParameters(),
+                                             cdkInput.appConfig()));
 
     }
 

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import attini.deploy.origin.DistributionData;
+import attini.deploy.origin.config.DistributionType;
 import attini.domain.DistributionContext;
 import attini.domain.DistributionName;
 import attini.domain.Environment;
@@ -15,7 +16,10 @@ import lombok.ToString;
 
 public interface DeployDataFacade {
 
-    void save(SaveDeploymentDataRequest request);
+    void savePlatformDeployment(SaveDeploymentDataRequest request);
+
+    void saveAppDeployment(SaveDeploymentDataRequest request,
+              String stackName, String sfnArn);
 
     int countDeployDataAfterDate(DistributionName distributionName, Environment environment, LocalDate from);
 

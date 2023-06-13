@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import deployment.plan.custom.resource.CfnRequestType;
+import deployment.plan.custom.resource.StackType;
 import deployment.plan.transform.Runner;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -62,4 +63,5 @@ public class RegisterDeployOriginDataRequest {
     public Map<String, Object> getPayloadDefaults() {
         return payloadDefaults;
     }
+
 }

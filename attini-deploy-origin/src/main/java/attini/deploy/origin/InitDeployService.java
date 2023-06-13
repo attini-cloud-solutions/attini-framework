@@ -13,8 +13,10 @@ import java.util.concurrent.CompletableFuture;
 import org.jboss.logging.Logger;
 import com.vdurmont.semver4j.Semver;
 
+import attini.deploy.origin.appdeployment.AppDeploymentFacade;
 import attini.deploy.origin.config.AttiniConfig;
 import attini.deploy.origin.config.DistributionDependency;
+import attini.deploy.origin.config.DistributionType;
 import attini.deploy.origin.config.InitDeployStackConfig;
 import attini.deploy.origin.deploystack.DeployDataFacade;
 import attini.deploy.origin.deploystack.DeployDataFacade.SaveDeploymentDataRequest;
@@ -43,6 +45,7 @@ public class InitDeployService {
     private final SystemClockFacade systemClockFacade;
     private final StepGuardFacade stepGuardFacade;
     private final DistributionDataFacade distributionDataFacade;
+    private final AppDeploymentFacade appDeploymentFacade;
 
     public InitDeployService(PublishArtifactService publishArtifactService,
                              DeployInitStackService deployInitStackService,
@@ -53,7 +56,7 @@ public class InitDeployService {
                              MonitoringFacade monitoringFacade,
                              SystemClockFacade systemClockFacade,
                              StepGuardFacade stepGuardFacade,
-                             DistributionDataFacade distributionDataFacade) {
+                             DistributionDataFacade distributionDataFacade, AppDeploymentFacade appDeploymentFacade) {
         this.publishArtifactService = requireNonNull(publishArtifactService, "publishArtifactService");
         this.deployInitStackService = requireNonNull(deployInitStackService, "deployInitStackService");
         this.deployDataFacade = requireNonNull(deployDataFacade, "deployDataFacade");
@@ -65,6 +68,7 @@ public class InitDeployService {
         this.systemClockFacade = requireNonNull(systemClockFacade, "systemClockFacade");
         this.stepGuardFacade = requireNonNull(stepGuardFacade, "stepGuardFacade");
         this.distributionDataFacade = requireNonNull(distributionDataFacade, "distributionDataFacade");
+        this.appDeploymentFacade = requireNonNull(appDeploymentFacade, "appDeploymentFacade");
     }
 
     public void initDeploy(InitDeployEvent initDeployEvent) {
@@ -90,6 +94,18 @@ public class InitDeployService {
                                                         distributionData.getArtifactPath());
 
 
+
+
+
+
+            attiniConfig.getAppConfig()
+                        .ifPresent(appConfig -> {
+                            appDeploymentFacade.runAppDeploymentPlan(appConfig,
+                                                                     createDistributionContext(initDeployEvent, attiniConfig),
+                                                                     distributionData, deployTime);
+                        });
+
+
             attiniConfig.getAttiniInitDeployStackConfig()
                         .ifPresentOrElse(initDeployStackConfig ->
                                                  handelInitDeployStack(createDistributionContext(initDeployEvent,
@@ -98,16 +114,18 @@ public class InitDeployService {
                                                                        distributionData,
                                                                        initDeployStackConfig),
                                          () -> {
-                                             deployDataFacade.save(SaveDeploymentDataRequest.builder()
-                                                                                            .distributionData(
-                                                                                                    distributionData)
-                                                                                            .distributionContext(
-                                                                                                    createDistributionContext(
-                                                                                                            initDeployEvent,
-                                                                                                            attiniConfig))
-                                                                                            .deployTime(deployTime)
-                                                                                            .isUnchanged(false)
-                                                                                            .build());
+                                             if (attiniConfig.getAppConfig().isEmpty()){
+                                                 deployDataFacade.savePlatformDeployment(SaveDeploymentDataRequest.builder()
+                                                                                                                  .distributionData(
+                                                                                                        distributionData)
+                                                                                                                  .distributionContext(
+                                                                                                        createDistributionContext(
+                                                                                                                initDeployEvent,
+                                                                                                                attiniConfig))
+                                                                                                                  .deployTime(deployTime)
+                                                                                                                  .isUnchanged(false)
+                                                                                                                  .build());
+                                             }
                                              validateDependencies(initDeployEvent.getEnvironmentName(), attiniConfig);
                                          }
                         );
@@ -117,14 +135,14 @@ public class InitDeployService {
             cleanup.join();
         } catch (PublishDistributionException e) {
             logger.error("There was an error publishing distribution", e);
-            deployDataFacade.save(SaveDeploymentDataRequest.builder()
-                                                           .deployTime(deployTime)
-                                                           .distributionContext(createDistributionContext(
+            deployDataFacade.savePlatformDeployment(SaveDeploymentDataRequest.builder()
+                                                                             .deployTime(deployTime)
+                                                                             .distributionContext(createDistributionContext(
                                                                    initDeployEvent, e))
-                                                           .error(new InitDeployError(
+                                                                             .error(new InitDeployError(
                                                                    "PublishDistributionError",
                                                                    e.getMessage() != null ? e.getMessage() : "error publishing artifacts to S3"))
-                                                           .build());
+                                                                             .build());
             throw new InitDeployException("Failed to publish distribution", e);
 
         }
@@ -158,12 +176,12 @@ public class InitDeployService {
         boolean shouldDeployNewsStack = shouldDeployNewsStack(distributionData,
                                                               initDeployStackConfig);
 
-        deployDataFacade.save(SaveDeploymentDataRequest.builder()
-                                                       .deployTime(deployTime)
-                                                       .distributionContext(distributionContext)
-                                                       .isUnchanged(!shouldDeployNewsStack)
-                                                       .distributionData(distributionData)
-                                                       .build());
+        deployDataFacade.savePlatformDeployment(SaveDeploymentDataRequest.builder()
+                                                                         .deployTime(deployTime)
+                                                                         .distributionContext(distributionContext)
+                                                                         .isUnchanged(!shouldDeployNewsStack)
+                                                                         .distributionData(distributionData)
+                                                                         .build());
 
         validateDependencies(distributionContext.getEnvironment(), distributionData.getAttiniConfig());
 
@@ -264,14 +282,14 @@ public class InitDeployService {
 
         } catch (DeployInitStackException e) {
             dynamoInitDeployStackFacade.setInitDeployError(initDeployStackConfig, e.getAwsErrorMessage());
-            deployDataFacade.save(SaveDeploymentDataRequest.builder()
-                                                           .distributionData(distributionData)
-                                                           .distributionContext(distributionContext)
-                                                           .isUnchanged(false)
-                                                           .deployTime(deployTime)
-                                                           .error(new InitDeployError(e.getAwsErrorCode(),
+            deployDataFacade.savePlatformDeployment(SaveDeploymentDataRequest.builder()
+                                                                             .distributionData(distributionData)
+                                                                             .distributionContext(distributionContext)
+                                                                             .isUnchanged(false)
+                                                                             .deployTime(deployTime)
+                                                                             .error(new InitDeployError(e.getAwsErrorCode(),
                                                                                       e.getAwsErrorMessage()))
-                                                           .build());
+                                                                             .build());
             throw new InitDeployException("Failed deploying init stack", e);
         }
     }

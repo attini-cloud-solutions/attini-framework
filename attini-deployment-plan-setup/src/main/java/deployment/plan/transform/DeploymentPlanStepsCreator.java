@@ -1,5 +1,6 @@
 package deployment.plan.transform;
 
+import static deployment.plan.transform.DeploymentPlanWrapper.DeploymentPlanType.INFRA;
 import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
@@ -28,6 +29,7 @@ public class DeploymentPlanStepsCreator {
     private final AttiniStepLoader attiniStepLoader;
     private final DeployData deployData;
     private final ObjectMapper objectMapper;
+
     public DeploymentPlanStepsCreator(AttiniStepLoader attiniStepLoader,
                                       DeployData deployData,
                                       ObjectMapper objectMapper) {
@@ -36,12 +38,15 @@ public class DeploymentPlanStepsCreator {
         this.objectMapper = requireNonNull(objectMapper, "objectMapper");
     }
 
-    public DeploymentPlanDefinition createDefinition(DeploymentPlanProperties deploymentPlanProperties) {
+    public DeploymentPlanDefinition createDefinition(DeploymentPlanWrapper deploymentPlanWrapper) {
 
+
+        DeploymentPlanProperties deploymentPlanProperties = deploymentPlanWrapper.getDeploymentPlanResource()
+                                                                                 .getDeploymentPlanProperties();
 
         ObjectNode states = objectMapper.createObjectNode();
 
-        states.setAll(getDeployDataState(deploymentPlanProperties));
+        states.setAll(getDeployDataState(deploymentPlanWrapper));
         states.setAll((ObjectNode) objectMapper.valueToTree(deploymentPlanProperties.getDeploymentPlan().getStates()));
         DeploymentPlanStates deploymentPlanSteps = transformStates(states,
                                                                    false,
@@ -56,11 +61,19 @@ public class DeploymentPlanStepsCreator {
                                             deploymentPlanSteps.attiniSteps());
     }
 
-    private ObjectNode getDeployDataState(DeploymentPlanProperties deploymentPlanProperties) {
+    private ObjectNode getDeployDataState(DeploymentPlanWrapper deploymentPlanWrapper) {
 
-        DeploymentPlan deploymentPlan = deploymentPlanProperties.getDeploymentPlan();
+        DeploymentPlan deploymentPlan = deploymentPlanWrapper.getDeploymentPlanResource()
+                                                             .getDeploymentPlanProperties()
+                                                             .getDeploymentPlan();
         ObjectNode states = objectMapper.valueToTree(deploymentPlan.getStates());
-        states.set(GET_DEPLOY_DATA_KEY, deployData.getDeployData(deploymentPlan.getStartAt()));
+        if (deploymentPlanWrapper.getDeploymentPlanType() == INFRA) {
+            states.set(GET_DEPLOY_DATA_KEY, deployData.getDeployData(deploymentPlan.getStartAt()));
+
+        }else {
+            states.set(GET_DEPLOY_DATA_KEY, deployData.getAppDeployData(deploymentPlan.getStartAt()));
+
+        }
         return states;
     }
 
@@ -122,8 +135,9 @@ public class DeploymentPlanStepsCreator {
                                                     DeploymentPlanStates states1 = transformStates(branch.get("States"),
                                                                                                    false,
                                                                                                    entry.getKey(),
-                                                                                                   defaultRunner, branch.get("StartAt")
-                                                                                                                        .asText());
+                                                                                                   defaultRunner,
+                                                                                                   branch.get("StartAt")
+                                                                                                         .asText());
                                                     attiniMangedSteps.addAll(states1.attiniSteps());
                                                     ObjectNode value = branch.deepCopy();
                                                     value.put("StartAt", states1.startAt());
@@ -213,11 +227,11 @@ public class DeploymentPlanStepsCreator {
                   }
               });
 
-        if (nextReplacements.containsKey(startAt)){
+        if (nextReplacements.containsKey(startAt)) {
             logger.info("Replacing startAt for branch, new value: " + nextReplacements.get(startAt));
-            return new DeploymentPlanStates(attiniMangedSteps, states,nextReplacements.get(startAt));
+            return new DeploymentPlanStates(attiniMangedSteps, states, nextReplacements.get(startAt));
         }
-        return new DeploymentPlanStates(attiniMangedSteps, states,startAt);
+        return new DeploymentPlanStates(attiniMangedSteps, states, startAt);
     }
 
     private ObjectNode getAttiniMapParameters() {

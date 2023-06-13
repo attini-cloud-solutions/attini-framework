@@ -25,9 +25,11 @@ public class DeploymentPlanProperties {
     private final Object policies;
 
     private final String defaultRunner;
+    private final CfnString name;
 
     @JsonCreator
     public DeploymentPlanProperties(@JsonProperty("DeploymentPlan") DeploymentPlan deploymentPlan,
+                                    @JsonProperty("Name") CfnString name,
                                     @JsonProperty("RoleArn") CfnString roleArn,
                                     @JsonProperty("DefinitionSubstitutions") Map<String, Object> definitionSubstitutions,
                                     @JsonProperty("PermissionsBoundary") CfnString permissionsBoundary,
@@ -39,6 +41,7 @@ public class DeploymentPlanProperties {
             throw new IllegalArgumentException(
                     "Attini::Deploy::DeploymentPlan resource is missing DeploymentPlan property");
         }
+        this.name = name;
         this.defaultRunner = defaultRunner;
         this.deploymentPlan = deploymentPlan;
         this.roleArn = roleArn;
@@ -56,6 +59,11 @@ public class DeploymentPlanProperties {
     @JsonProperty("RoleArn")
     public Optional<CfnString> getRoleArn() {
         return Optional.ofNullable(roleArn);
+    }
+
+    @JsonProperty("Name")
+    public Optional<CfnString> getName() {
+        return Optional.ofNullable(name);
     }
 
     @JsonProperty("DefinitionSubstitutions")

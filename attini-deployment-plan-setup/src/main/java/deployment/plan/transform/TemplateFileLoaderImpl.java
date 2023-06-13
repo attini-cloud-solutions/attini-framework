@@ -10,6 +10,7 @@ import java.io.File;
 public class TemplateFileLoaderImpl implements TemplateFileLoader {
 
     public static final String DEPLOY_DATA_STATE_JSON_FILE = "deploy-data-state.json";
+    public static final String APP_DEPLOY_DATA_STATE_JSON_FILE = "app-deploy-data-state.json";
 
     public static final String ATTINI_CFN_TEMPLATE_FILE = "attini-cfn-template.json";
 
@@ -37,6 +38,12 @@ public class TemplateFileLoaderImpl implements TemplateFileLoader {
     public File getDeployStateTemplate() {
         return new File(DEPLOY_DATA_STATE_JSON_FILE);
     }
+
+    @Override
+    public File getAppDeployStateTemplate() {
+        return new File(APP_DEPLOY_DATA_STATE_JSON_FILE);
+    }
+
 
     @Override
     public File getAttiniCfnTemplate() {

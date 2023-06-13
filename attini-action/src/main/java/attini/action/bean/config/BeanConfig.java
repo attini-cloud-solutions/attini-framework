@@ -3,6 +3,8 @@ package attini.action.bean.config;
 import java.net.URI;
 import java.time.Duration;
 
+import attini.action.actions.getdeployorigindata.GetAppDeployOriginDataHandler;
+import attini.action.actions.posthook.PostPipelineHook;
 import attini.action.actions.sam.SamPackageRunnerAdapter;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -107,7 +109,7 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
-    public EcsFacade ecsFacade(EnvironmentVariables environmentVariables, ResourceStateFacade resourceStateFacade ) {
+    public EcsFacade ecsFacade(EnvironmentVariables environmentVariables, ResourceStateFacade resourceStateFacade) {
         return new EcsFacade(EcsClient.create(), environmentVariables, resourceStateFacade);
     }
 
@@ -364,6 +366,32 @@ public class BeanConfig {
                                               initStackDataFacade,
                                               objectMapper,
                                               deploymentPlanDataFacade);
+    }
+
+    @ApplicationScoped
+    public GetAppDeployOriginDataHandler getAppDeployOriginDataHandler(DeployOriginFacade deployOriginFacade,
+                                                                       StepFunctionFacade stepFunctionFacade,
+                                                                       DistributionDataFacade distributionDataFacade,
+                                                                       ObjectMapper objectMapper,
+                                                                       DeploymentPlanDataFacade deploymentPlanDataFacade) {
+        return new GetAppDeployOriginDataHandler(deployOriginFacade,
+                                                 stepFunctionFacade,
+                                                 distributionDataFacade,
+                                                 objectMapper,
+                                                 deploymentPlanDataFacade);
+    }
+
+    @ApplicationScoped
+    public PostPipelineHook postPipelineHook(ObjectMapper objectMapper,
+                                             SendUsageDataFacade sendUsageDataFacade,
+                                             DeployOriginFacade deployOriginFacade,
+                                             DeploymentPlanDataFacade deploymentPlanDataFacade,
+                                             ArtifactStoreFacade artifactStoreFacade){
+        return new PostPipelineHook(objectMapper,
+                                    sendUsageDataFacade,
+                                    deployOriginFacade,
+                                    deploymentPlanDataFacade,
+                                    artifactStoreFacade);
     }
 
     @ApplicationScoped

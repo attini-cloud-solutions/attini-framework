@@ -9,6 +9,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import attini.domain.DistributionId;
+import attini.domain.DistributionName;
+import attini.domain.Environment;
+import attini.domain.ObjectIdentifier;
 import deployment.plan.transform.AttiniStep;
 import lombok.Builder;
 import lombok.ToString;
@@ -16,10 +20,10 @@ import lombok.ToString;
 @ToString
 @Builder(builderClassName = "Builder")
 public class DeploymentPlanResourceState {
-    private final String attiniEnvironmentName;
-    private final String attiniDistributionName;
-    private final String attiniDistributionId;
-    private final String attiniObjectIdentifier;
+    private final Environment environment;
+    private final DistributionName distributionName;
+    private final DistributionId distributionId;
+    private final ObjectIdentifier objectIdentifier;
     private final String sfnArn;
     private final String stackName;
     private final List<AttiniStep> attiniSteps;
@@ -27,16 +31,16 @@ public class DeploymentPlanResourceState {
     private final Map<String, Object> payloadDefaults;
 
 
-    public String getAttiniEnvironmentName() {
-        return attiniEnvironmentName;
+    public Environment getEnvironment() {
+        return environment;
     }
 
-    public String getAttiniDistributionName() {
-        return attiniDistributionName;
+    public DistributionName getDistributionName() {
+        return distributionName;
     }
 
-    public String getAttiniObjectIdentifier() {
-        return attiniObjectIdentifier;
+    public ObjectIdentifier getObjectIdentifier() {
+        return objectIdentifier;
     }
 
     public String getSfnArn() {
@@ -47,8 +51,8 @@ public class DeploymentPlanResourceState {
         return stackName;
     }
 
-    public String getAttiniDistributionId() {
-        return attiniDistributionId;
+    public DistributionId getDistributionId() {
+        return distributionId;
     }
 
     public List<AttiniStep> getAttiniSteps() {

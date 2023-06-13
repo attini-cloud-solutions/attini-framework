@@ -11,6 +11,8 @@ import java.util.Map;
 
 import org.jboss.logging.Logger;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import deployment.plan.custom.resource.CfnRequestType;
 
 public class RegisterDeploymentPlanTriggerService {
@@ -21,9 +23,9 @@ public class RegisterDeploymentPlanTriggerService {
         this.deployStatesFacade = requireNonNull(deployStatesFacade, "deployStatesFacade");
     }
 
-    @SuppressWarnings("unchecked")
-    public void registerDeploymentPlanTrigger(Map<String, Object> input, CfnRequestType requestType){
-        Map<String, Object> resourceProperties = (Map<String, Object>) input.get("ResourceProperties");
+
+    public void registerDeploymentPlanTrigger(JsonNode input, CfnRequestType requestType) {
+        JsonNode resourceProperties = input.get("ResourceProperties");
         SfnProperties sfnProperties = createSfnProperties(resourceProperties);
         deployStatesFacade.removeErrors(sfnProperties.stackName);
         switch (requestType) {
@@ -32,7 +34,7 @@ public class RegisterDeploymentPlanTriggerService {
                 deployStatesFacade.saveSfnTrigger(sfnProperties.sfnArn, sfnProperties.stackName);
             }
             case UPDATE -> {
-                Map<String, Object> oldResourceProperties = (Map<String, Object>) input.get("OldResourceProperties");
+                JsonNode oldResourceProperties = input.path("OldResourceProperties");
                 SfnProperties oldSfnProperties = createSfnProperties(oldResourceProperties);
                 updateTrigger(sfnProperties, oldSfnProperties);
             }
@@ -44,23 +46,22 @@ public class RegisterDeploymentPlanTriggerService {
         }
     }
 
-    private static SfnProperties createSfnProperties(Map<String, Object> resourceProperties) {
+    private static SfnProperties createSfnProperties(JsonNode resourceProperties) {
         return new SfnProperties(
-                (String) resourceProperties.get("SfnArn"),
-                (String) resourceProperties.get("SfnName"),
-                (String) resourceProperties.get("StackName")
+                resourceProperties.path("SfnArn").asText(),
+                resourceProperties.path("SfnName").asText(),
+                resourceProperties.path("StackName").asText()
         );
     }
 
-    private void updateTrigger(SfnProperties newSfnProperties,  SfnProperties oldSfnProperties){
-        if (!newSfnProperties.sfnArn.equals(oldSfnProperties.sfnArn)){
+    private void updateTrigger(SfnProperties newSfnProperties, SfnProperties oldSfnProperties) {
+        if (!newSfnProperties.sfnArn.equals(oldSfnProperties.sfnArn)) {
             logger.info("Updating Trigger");
             deployStatesFacade.deleteSfnTrigger(oldSfnProperties.sfnArn, oldSfnProperties.stackName);
         }
         deployStatesFacade.saveSfnTrigger(newSfnProperties.sfnArn, newSfnProperties.stackName);
 
     }
-
 
 
 }

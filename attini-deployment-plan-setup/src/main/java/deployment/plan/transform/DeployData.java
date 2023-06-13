@@ -5,6 +5,7 @@
 
 package deployment.plan.transform;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
@@ -24,10 +25,18 @@ public class DeployData {
 
     public JsonNode getDeployData(String nextStep) {
 
+       return getNode(nextStep, templateFileLoader.getDeployStateTemplate());
+    }
 
+    public JsonNode getAppDeployData(String nextStep) {
+
+        return getNode(nextStep,templateFileLoader.getAppDeployStateTemplate());
+    }
+
+    private ObjectNode getNode(String nextStep, File file){
         ObjectMapper objectMapper = new ObjectMapper();
         try {
-            ObjectNode node = (ObjectNode) objectMapper.readTree(templateFileLoader.getDeployStateTemplate());
+            ObjectNode node = (ObjectNode) objectMapper.readTree(file);
             node.put("Next", nextStep);
             return node;
         } catch (IOException e) {

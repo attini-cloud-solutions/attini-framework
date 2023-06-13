@@ -90,7 +90,8 @@ public class SamPackageRunnerAdapter {
                                              samInput.deployOriginData(),
                                              samInput.dependencies(),
                                              samInput.customData(),
-                                             samInput.stackParameters()));
+                                             samInput.stackParameters(),
+                                             samInput.appConfig()));
 
     }
 

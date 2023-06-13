@@ -8,6 +8,7 @@ import java.util.Map;
 
 import attini.action.domain.DeploymentPlanStateData;
 import attini.action.system.EnvironmentVariables;
+import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeAction;
@@ -70,7 +71,8 @@ public class DeploymentPlanDataDynamoFacade implements DeploymentPlanDataFacade 
                                                       .build();
         GetItemResponse getItemResponse = dynamoDbClient.getItem(getItemRequest);
         deployOriginSourceNames.put("DistributionName", getItemResponse.item().get("distributionName").s());
-        deployOriginSourceNames.put("EnvironmentName", getItemResponse.item().get("environment").s());
+        String environment = getItemResponse.item().get("environment").s();
+        deployOriginSourceNames.put("EnvironmentName", environment);
         String sourceName = String.format("%s-%s",
                                           deployOriginSourceNames.get("EnvironmentName"),
                                           deployOriginSourceNames.get("DistributionName"));
@@ -79,7 +81,8 @@ public class DeploymentPlanDataDynamoFacade implements DeploymentPlanDataFacade 
                                                                                           .s() : "{}"; //default value is strictly for backward compatability, would throw en exception if someone would rerun an old deployment plan
 
 
-        return new DeploymentPlanStateData(sourceName, ObjectIdentifier.of( getItemResponse.item().get("attiniObjectIdentifier").s()), payloadDefaults);
+        return new DeploymentPlanStateData(sourceName, ObjectIdentifier.of( getItemResponse.item().get("attiniObjectIdentifier").s()), payloadDefaults,
+                                           Environment.of(environment));
 
     }
 

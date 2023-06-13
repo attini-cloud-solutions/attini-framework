@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import attini.deploy.origin.appdeployment.AppConfig;
 import attini.domain.DistributionId;
 import attini.domain.DistributionName;
 import attini.domain.Version;
@@ -20,15 +21,19 @@ public class AttiniConfigImpl implements AttiniConfig {
     private final DistributionName distributionName;
     private final Map<String, String> distributionTags;
 
+    private final AppConfig appConfig;
+
     private final Version version;
 
+
     private AttiniConfigImpl(Builder builder) {
-        dependencies = builder.dependencies;
-        attiniInitDeployStackConfig = builder.attiniInitDeployStackConfig;
-        distributionId = requireNonNull(builder.distributionId, "distributionId");
-        distributionName = requireNonNull(builder.distributionName, "distributionName");
-        distributionTags = builder.distributionTags;
+        this.dependencies = builder.dependencies;
+        this.attiniInitDeployStackConfig = builder.attiniInitDeployStackConfig;
+        this.distributionId = requireNonNull(builder.distributionId, "distributionId");
+        this.distributionName = requireNonNull(builder.distributionName, "distributionName");
+        this.distributionTags = builder.distributionTags;
         this.version = builder.version;
+        this.appConfig = builder.appConfig;
     }
 
     public static Builder builder() {
@@ -56,6 +61,11 @@ public class AttiniConfigImpl implements AttiniConfig {
     @Override
     public List<DistributionDependency> getDependencies() {
         return dependencies == null ? Collections.emptyList() : dependencies;
+    }
+
+    @Override
+    public Optional<AppConfig> getAppConfig() {
+        return Optional.ofNullable(appConfig);
     }
 
     @Override
@@ -106,6 +116,8 @@ public class AttiniConfigImpl implements AttiniConfig {
         private Map<String, String> distributionTags;
         private Version version;
 
+        private AppConfig appConfig;
+
         private Builder() {
         }
 
@@ -136,6 +148,11 @@ public class AttiniConfigImpl implements AttiniConfig {
 
         public Builder version(Version val) {
             version = val;
+            return this;
+        }
+
+        public Builder appConfig(AppConfig val) {
+            appConfig = val;
             return this;
         }
 

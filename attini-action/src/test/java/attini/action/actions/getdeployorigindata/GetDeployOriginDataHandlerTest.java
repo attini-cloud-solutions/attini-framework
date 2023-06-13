@@ -72,7 +72,7 @@ class GetDeployOriginDataHandlerTest {
     @Mock
     DeploymentPlanDataFacade deploymentPlanDataFacade;
 
-    private final ObjectMapper objectMapper = new ObjectMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES );
+    private final ObjectMapper objectMapper = new ObjectMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
 
     GetDeployOriginDataHandler getDeployOriginDataHandler;
@@ -97,9 +97,14 @@ class GetDeployOriginDataHandlerTest {
                 "some-arn-1123232323232"));
 
         DeployOriginData deployDatMockData = DeployOriginDataTestBuilder.aDeployOriginData().build();
-        DeploymentPlanStateData deploymentPlanStateData = new DeploymentPlanStateData("dev-infra", ObjectIdentifier.of("123231232"), "{}");
+        DeploymentPlanStateData deploymentPlanStateData = new DeploymentPlanStateData("dev-infra",
+                                                                                      ObjectIdentifier.of("123231232"),
+                                                                                      "{}",
+                                                                                      Environment.of("dev"));
         when(deploymentPlanDataFacade.getDeploymentPlan(sfnArn)).thenReturn(deploymentPlanStateData);
-        when(deployOriginFacade.getDeployOriginData(deploymentPlanStateData.getObjectIdentifier(), deploymentPlanStateData.getDeployOriginSourceName())).thenReturn(deployDatMockData);
+        when(deployOriginFacade.getDeployOriginData(deploymentPlanStateData.getObjectIdentifier(),
+                                                    deploymentPlanStateData.getDeployOriginSourceName())).thenReturn(
+                deployDatMockData);
         when(distributionDataFacade.getDistribution(any(DistributionName.class), any(Environment.class))).thenReturn(
                 TestBuilders.aDistribution().build());
         String stackName = deployDatMockData.getStackName();
@@ -124,10 +129,14 @@ class GetDeployOriginDataHandlerTest {
         when(stepFunctionFacade.listExecutions(sfnArn)).thenReturn(Stream.of(
                 "some-arn-1123232323232"));
         DeployOriginData deployDatMockData = DeployOriginDataTestBuilder.aDeployOriginData().build();
-        DeploymentPlanStateData deploymentPlanStateData = new DeploymentPlanStateData("dev-infra", ObjectIdentifier.of("123231232"), "{}");
+        DeploymentPlanStateData deploymentPlanStateData = new DeploymentPlanStateData("dev-infra",
+                                                                                      ObjectIdentifier.of("123231232"),
+                                                                                      "{}", Environment.of("dev"));
         when(deploymentPlanDataFacade.getDeploymentPlan(sfnArn)).thenReturn(deploymentPlanStateData);
 
-        when(deployOriginFacade.getDeployOriginData(deploymentPlanStateData.getObjectIdentifier(), deploymentPlanStateData.getDeployOriginSourceName())).thenReturn(deployDatMockData);
+        when(deployOriginFacade.getDeployOriginData(deploymentPlanStateData.getObjectIdentifier(),
+                                                    deploymentPlanStateData.getDeployOriginSourceName())).thenReturn(
+                deployDatMockData);
         when(distributionDataFacade.getDistribution(any(DistributionName.class), any(Environment.class))).thenReturn(
                 TestBuilders.aDistribution().build());
         String stackName = deployDatMockData.getStackName();

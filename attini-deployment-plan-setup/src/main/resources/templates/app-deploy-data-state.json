@@ -1,0 +1,16 @@
+{
+  "Type": "Task",
+  "Resource": {
+    "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:attini-action"
+  },
+  "Parameters": {
+    "payload.$": "$",
+    "distributionName.$": "$.distributionName",
+    "objectIdentifier.$": "$.objectIdentifier",
+    "appConfig.$": "$.appConfig",
+    "attiniActionType": "GetAppDeployOriginData",
+    "sfnArn.$": "$$.StateMachine.Id",
+    "executionArn.$": "$$.Execution.Id"
+  },
+  "ResultPath": "$"
+}

@@ -53,9 +53,10 @@ public class RunnerHandler {
                                                                                           .stepName());
 
             RunnerData runnerData = resourceStateFacade.getRunnerData(runnerInput.deployOriginData().getStackName(),
-                                                                      runnerInput.properties().runner()).toBuilder()
+                                                                      runnerInput.properties().runner())
+                                                       .toBuilder()
                                                        .startedByExecutionArn(runnerInput.deploymentPlanExecutionMetadata()
-                                                                                           .executionArn())
+                                                                                         .executionArn())
                                                        .build();
 
             sqsClient.sendMessage(SendMessageRequest.builder()
@@ -74,9 +75,10 @@ public class RunnerHandler {
                                      runnerInput.deploymentPlanExecutionMetadata().sfnToken(),
                                      runnerInput);
 
-        } catch (AcquireEc2StartLockException e){
-            logger.info("Failed to acquire lock for starting the EC2 instance. Another step has started it and will assume responsibility for starting the ECS task");
-        } catch (AcquireEcsStartLockException e){
+        } catch (AcquireEc2StartLockException e) {
+            logger.info(
+                    "Failed to acquire lock for starting the EC2 instance. Another step has started it and will assume responsibility for starting the ECS task");
+        } catch (AcquireEcsStartLockException e) {
             logger.info("Failed to acquire lock for starting the ECS instance.");
         } catch (Ec2FailedToStartException e) {
             logger.error("EC2 instance did not start correctly", e);
@@ -198,15 +200,12 @@ public class RunnerHandler {
                   return new PollingResult<>(false);
               }).setCalls(300)
               .setInterval(2, TimeUnit.SECONDS)
-                .setTimeoutExceptionSupplier(() -> {
-                    ecsFacade.stopTask(taskId, cluster, "Task did not start within the expected time frame");
-                    return new IllegalStateException("Task did not start within the expected time frame");
-                })
+              .setTimeoutExceptionSupplier(() -> {
+                  ecsFacade.stopTask(taskId, cluster, "Task did not start within the expected time frame");
+                  return new IllegalStateException("Task did not start within the expected time frame");
+              })
               .build()
               .poll();
-
-
-
 
 
     }

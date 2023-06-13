@@ -11,6 +11,7 @@ import static java.util.stream.Collectors.toList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.jboss.logging.Logger;
@@ -27,6 +28,7 @@ import attini.domain.Version;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValueUpdate;
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
@@ -176,6 +178,29 @@ public class DeployOriginFacade {
 
     }
 
+    public Set<String> getLatestExecutionArns(String deploymentName) {
+
+        logger.info("Getting latest executions for deployment: " + deploymentName);
+        return dynamoDbClient.query(QueryRequest.builder()
+                                                .consistentRead(true)
+                                                .tableName(environmentVariables.getDeployOriginTableName())
+                                                .keyConditionExpression("deploymentName = :v_deploymentName")
+                                                .expressionAttributeValues(Map.of(":v_deploymentName",
+                                                                                  AttributeValue.fromS(deploymentName)))
+                                                .limit(5)
+                                                .scanIndexForward(false)
+                                                .build())
+                             .items()
+                             .stream()
+                             .peek(stringAttributeValueMap -> System.out.println(stringAttributeValueMap.get("deploymentTime").n()))
+                             .flatMap(stringAttributeValueMap -> stringAttributeValueMap.get("executionArns")
+                                                                                        .m()
+                                                                                        .values()
+                                                                                        .stream())
+                             .map(AttributeValue::s)
+                             .collect(Collectors.toSet());
+    }
+
     public DeployOriginData getDeployOriginData(ObjectIdentifier objectIdentifier, String deploymentName) {
 
         QueryRequest queryRequest = QueryRequest.builder()
@@ -227,6 +252,7 @@ public class DeployOriginFacade {
                                .version(item.get("version") != null ? Version.of(item.get("version").s()) : null)
                                .samPackaged(item.get("samPackaged") != null ? item.get("samPackaged").bool() : false)
                                .distributionTags(toMap(item.get("distributionTags").m()))
+                               .executionArns(toMap(item.get("executionArns").m()))
                                .build();
     }
 

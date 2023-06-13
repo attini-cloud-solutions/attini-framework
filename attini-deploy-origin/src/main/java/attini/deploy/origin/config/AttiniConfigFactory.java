@@ -1,5 +1,7 @@
 package attini.deploy.origin.config;
 
+import static attini.deploy.origin.config.DistributionType.APP;
+import static attini.deploy.origin.config.DistributionType.PLATFORM;
 import static java.util.Objects.requireNonNull;
 
 import java.io.IOException;
@@ -13,14 +15,17 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.text.StringSubstitutor;
+import org.checkerframework.checker.units.qual.A;
 import org.jboss.logging.Logger;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import attini.deploy.origin.AttiniConfigException;
 import attini.deploy.origin.InitDeployEvent;
+import attini.deploy.origin.appdeployment.AppConfig;
 import attini.domain.DistributionId;
 import attini.domain.DistributionName;
 import attini.domain.Environment;
@@ -76,20 +81,38 @@ public class AttiniConfigFactory {
 
         List<DistributionDependency> dependencies = createDependencies(configMap, distributionName, distributionId);
 
+        DistributionType distributionType = "app".equals(configMap.get("distributionType")) ? APP : PLATFORM;
 
-        return AttiniConfigImpl.builder()
-                               .attiniInitDeployStackConfig(extractAttiniInitDeployStackConfig(configMap,
-                                                                                               event.getEnvironmentName(),
-                                                                                               dependencies).orElse(
-                                       null))
-                               .dependencies(dependencies)
-                               .version(createVersion(configMap))
-                               .distributionId(distributionId)
-                               .distributionName(distributionName)
-                               .distributionTags(createAttiniDistributionTags(configMap,
-                                                                              distributionName,
-                                                                              distributionId))
-                               .build();
+        AttiniConfigImpl.Builder builder = AttiniConfigImpl.builder();
+
+        if (distributionType == APP) {
+            if (configMap.get("appDeploymentPlan") == null){
+                String message = "\"appDeploymentPlan\" is missing from attini-config. \"appDeploymentPlan\" is mandatory for app distributions";
+                logger.error(message);
+                throw new AttiniConfigException(AttiniConfigException.ErrorCode.INVALID_INPUT,
+                                                message,
+                                                distributionName,
+                                                distributionId);
+            }
+            builder.appConfig(new AppConfig( mapper.valueToTree(configMap.get("appConfig")),
+                                            mapper,
+                                            configMap.get("appDeploymentPlan").toString(), event.getEnvironmentName()));
+        }
+
+
+        return builder
+                .attiniInitDeployStackConfig(extractAttiniInitDeployStackConfig(configMap,
+                                                                                event.getEnvironmentName(),
+                                                                                dependencies).orElse(
+                        null))
+                .dependencies(dependencies)
+                .version(createVersion(configMap))
+                .distributionId(distributionId)
+                .distributionName(distributionName)
+                .distributionTags(createAttiniDistributionTags(configMap,
+                                                               distributionName,
+                                                               distributionId))
+                .build();
     }
 
     private DistributionId createDistributionId(Map<String, Object> configMap) {

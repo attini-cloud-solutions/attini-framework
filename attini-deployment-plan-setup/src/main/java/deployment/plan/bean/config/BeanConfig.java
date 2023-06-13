@@ -8,7 +8,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import attini.domain.CustomAwsClient;
 import deployment.plan.custom.resource.CfnResponseSender;
 import deployment.plan.custom.resource.CustomResourceHandler;
+import deployment.plan.custom.resource.service.AppDeploymentService;
 import deployment.plan.custom.resource.service.DeployStatesFacade;
+import deployment.plan.custom.resource.service.DeploymentPlanStateFactory;
 import deployment.plan.custom.resource.service.RegisterDeployOriginDataService;
 import deployment.plan.custom.resource.service.RegisterDeploymentPlanTriggerService;
 import deployment.plan.system.EnvironmentVariables;
@@ -86,8 +88,8 @@ public class BeanConfig {
 
     @ApplicationScoped
     RegisterDeployOriginDataService registerDeployOriginDataService(DeployStatesFacade deployStatesFacade,
-                                                                    @CustomAwsClient CloudFormationClient cloudFormationClient) {
-        return new RegisterDeployOriginDataService(deployStatesFacade, cloudFormationClient);
+                                                                   DeploymentPlanStateFactory deploymentPlanStateFactory) {
+        return new RegisterDeployOriginDataService(deployStatesFacade, deploymentPlanStateFactory);
     }
 
 
@@ -117,15 +119,25 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
+    DeploymentPlanStateFactory deploymentPlanStateFactory(@CustomAwsClient CloudFormationClient cloudFormationClient, DeployStatesFacade deployStatesFacade){
+        return new DeploymentPlanStateFactory(cloudFormationClient, deployStatesFacade);
+    }
+
+    @ApplicationScoped
+    AppDeploymentService appDeploymentService(DeployStatesFacade deployStatesFacade, DeploymentPlanStateFactory deploymentPlanStateFactory){
+        return new AppDeploymentService(deployStatesFacade, deploymentPlanStateFactory);
+    }
+
+    @ApplicationScoped
     public CustomResourceHandler customResourceHandler(RegisterDeploymentPlanTriggerService registerDeploymentPlanTriggerService,
                                                        RegisterDeployOriginDataService registerDeployOriginDataService,
-                                                       ObjectMapper objectMapper) {
+                                                       ObjectMapper objectMapper, AppDeploymentService appDeploymentService) {
 
 
         return new CustomResourceHandler(registerDeploymentPlanTriggerService,
                                          registerDeployOriginDataService,
                                          new CfnResponseSender(),
-                                         objectMapper);
+                                         objectMapper, appDeploymentService);
     }
 
     private static ClientOverrideConfiguration createClientOverrideConfiguration() {
