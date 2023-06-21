@@ -7,7 +7,7 @@ package attini.action.actions.getdeployorigindata;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Collections;
+import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -22,12 +22,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import attini.action.domain.DeploymentPlanStateData;
 import attini.action.facades.deployorigin.DeployOriginFacade;
+import attini.action.facades.stackdata.AppDeploymentPlanDataFacade;
 import attini.action.facades.stackdata.DeploymentPlanDataFacade;
 import attini.action.facades.stackdata.DistributionDataFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
 import attini.domain.DeployOriginData;
 import attini.domain.DistributionName;
 import attini.domain.Environment;
+import attini.domain.ObjectIdentifier;
 
 public class GetAppDeployOriginDataHandler {
 
@@ -37,20 +39,26 @@ public class GetAppDeployOriginDataHandler {
     private final DistributionDataFacade distributionDataFacade;
     private final ObjectMapper objectMapper;
     private final DeploymentPlanDataFacade deploymentPlanDataFacade;
+    private final AppDeploymentPlanDataFacade appDeploymentPlanDataFacade;
+
 
     public GetAppDeployOriginDataHandler(DeployOriginFacade deployOriginFacade,
                                          StepFunctionFacade stepFunctionFacade,
                                          DistributionDataFacade distributionDataFacade,
                                          ObjectMapper objectMapper,
-                                         DeploymentPlanDataFacade deploymentPlanDataFacade) {
+                                         DeploymentPlanDataFacade deploymentPlanDataFacade,
+                                         AppDeploymentPlanDataFacade appDeploymentPlanDataFacade) {
         this.deployOriginFacade = requireNonNull(deployOriginFacade, "deployOriginFacade");
         this.stepFunctionFacade = requireNonNull(stepFunctionFacade, "stepFunctionFacade");
         this.distributionDataFacade = requireNonNull(distributionDataFacade, "distributionDataFacade");
         this.objectMapper = requireNonNull(objectMapper, "objectMapper");
         this.deploymentPlanDataFacade = requireNonNull(deploymentPlanDataFacade, "deploymentPlanDataFacade");
+        this.appDeploymentPlanDataFacade = requireNonNull(appDeploymentPlanDataFacade, "appDeploymentPlanDataFacade");
     }
 
     public Map<String, Object> getAppDeployOriginData(Map<String, Object> input) {
+
+        logger.info("Getting app deployment data");
 
         GetAppDeployOriginDataRequest getDeployOriginDataRequest = toGetAppDeployOriginDataRequest(
                 input);
@@ -58,11 +66,8 @@ public class GetAppDeployOriginDataHandler {
         DeploymentPlanStateData deploymentPlan = deploymentPlanDataFacade.getDeploymentPlan(getDeployOriginDataRequest.getSfnArn());
 
 
-        String deploySourceName = "%s-%s".formatted(
-                deploymentPlan.getEnvironment()
-                              .asString(),
-                getDeployOriginDataRequest.getDistributionName()
-                                          .asString());
+        String deploySourceName = getDeploySourceName(getDeployOriginDataRequest.getDistributionName(),
+                                                      deploymentPlan.getEnvironment());
         final DeployOriginData deployOriginData = deployOriginFacade.getDeployOriginData(getDeployOriginDataRequest.getObjectIdentifier(),
                                                                                          deploySourceName);
 
@@ -97,17 +102,59 @@ public class GetAppDeployOriginDataHandler {
 
         ObjectNode payload = objectMapper.valueToTree(input.get("payload"));
 
+        DeployOriginData platformDeploymentData =
+                deployOriginFacade.getDeployOriginData(ObjectIdentifier.of(payload.get("platformDistributionIdentifier")
+                                                                                  .asText()),
+                                                       getDeploySourceName(DistributionName.of(payload.get(
+                                                                                                              "platformDistributionName")
+                                                                                                      .textValue()),
+                                                                           deploymentPlan.getEnvironment()));
+
+
         payload.remove("appConfig");
         payload.remove("distributionId");
-        return Map.of("deploymentOriginData", deployOriginData,
-                      "output", createOutput(deploymentPlan),
-                      "dependencies", dependencies,
-                      "environment", environment.asString(),
-                      "customData", payload,
-                      "appConfig", input.get("appConfig"),
-                      "stackParameters", Collections.emptyMap());//TODO add
+        payload.remove("distributionName");
+        payload.remove("objectIdentifier");
+        JsonNode appDeploymentPlanNode = payload.remove("appDeploymentPlan");
+        if (appDeploymentPlanNode == null) {
+            throw new IllegalArgumentException("Error when reading appDeploymentPlan from payload.");
+        }
+
+        ObjectNode deployOriginDataNode = objectMapper.valueToTree(deployOriginData);
+        ObjectNode platformDistributionData = objectMapper.createObjectNode();
+        platformDistributionData.put("distributionName", platformDeploymentData.getDistributionName().asString());
+        platformDistributionData.put("sourceLocation",
+                                     "s3://%s/%s".formatted(platformDeploymentData.getDeploySource()
+                                                                             .getAttiniDeploySourceBucket(),
+                                                       platformDeploymentData.getDeploySource()
+                                                                             .getAttiniDeploySourcePrefix()));
+        deployOriginDataNode.set("platformDistributionData", platformDistributionData);
+
+        return Map.of("deploymentOriginData",
+                      deployOriginDataNode,
+                      "output",
+                      createOutput(deploymentPlan),
+                      "dependencies",
+                      dependencies,
+                      "environment",
+                      environment.asString(),
+                      "customData",
+                      payload,
+                      "appConfig",
+                      input.get("appConfig"),
+                      "stackParameters",
+                      appDeploymentPlanDataFacade.getStackParameters(appDeploymentPlanNode.asText(), environment));
 
 
+    }
+
+    private static String getDeploySourceName(DistributionName distributionName,
+                                              Environment environment) {
+        return "%s-%s".formatted(
+                environment
+                        .asString(),
+                distributionName
+                        .asString());
     }
 
     private HashMap<String, Object> createOutput(DeploymentPlanStateData deploymentPlan) {
@@ -121,7 +168,7 @@ public class GetAppDeployOriginDataHandler {
             }
             return new HashMap<>();
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -129,15 +176,16 @@ public class GetAppDeployOriginDataHandler {
                                           String deploySourceName) {
 
         Set<String> currentExecutions = stepFunctionFacade.listExecutions(getDeployOriginDataRequest.getSfnArn())
-                                                .filter(execution -> !execution.equals(getDeployOriginDataRequest.getExecutionArn()))
-                                                .collect(Collectors.toSet());
+                                                          .filter(execution -> !execution.equals(
+                                                                  getDeployOriginDataRequest.getExecutionArn()))
+                                                          .collect(Collectors.toSet());
 
-        if (!currentExecutions.isEmpty()){
+        if (!currentExecutions.isEmpty()) {
             deployOriginFacade.getLatestExecutionArns(deploySourceName)
                               .stream()
                               .filter(currentExecutions::contains)
                               .forEach(execution -> stepFunctionFacade.stopExecution(execution,
-                                                                                "Stopped due to new execution started"));
+                                                                                     "Stopped due to new execution started"));
         }
     }
 

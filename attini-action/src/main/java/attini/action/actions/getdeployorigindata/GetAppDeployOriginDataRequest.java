@@ -8,7 +8,6 @@ package attini.action.actions.getdeployorigindata;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import attini.action.domain.Distribution;
 import attini.domain.DistributionName;
 import attini.domain.ObjectIdentifier;
 import io.quarkus.runtime.annotations.RegisterForReflection;

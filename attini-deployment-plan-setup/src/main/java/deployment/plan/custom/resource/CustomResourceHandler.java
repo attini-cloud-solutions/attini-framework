@@ -5,15 +5,12 @@
 
 package deployment.plan.custom.resource;
 
-import static deployment.plan.custom.resource.StackType.APP;
-import static deployment.plan.custom.resource.StackType.INFRA;
 import static java.util.Objects.requireNonNull;
 
 import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,11 +18,8 @@ import java.util.Map;
 import org.jboss.logging.Logger;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import deployment.plan.custom.resource.service.AppDeploymentService;
 import deployment.plan.custom.resource.service.RegisterDeployOriginDataRequest;

@@ -85,7 +85,7 @@ public class Poller <V> {
         }
 
         public Poller<V> build() {
-            return new Poller<V>(this);
+            return new Poller<>(this);
         }
     }
 }

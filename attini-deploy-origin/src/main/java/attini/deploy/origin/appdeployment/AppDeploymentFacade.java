@@ -3,12 +3,10 @@ package attini.deploy.origin.appdeployment;
 import static java.util.Objects.requireNonNull;
 
 import org.jboss.logging.Logger;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import attini.deploy.origin.DistributionData;
-import attini.deploy.origin.config.DistributionType;
 import attini.deploy.origin.deploystack.DeployDataFacade;
 import attini.domain.DistributionContext;
 import software.amazon.awssdk.services.sfn.SfnClient;
@@ -34,17 +32,23 @@ public class AppDeploymentFacade {
 
     public void runAppDeploymentPlan(AppConfig appConfig,
                                      DistributionContext distributionContext,
-                                     DistributionData distributionData, long deployTime) {
+                                     DistributionData distributionData,
+                                     long deployTime) {
+
+
+        AppDeploymentDataFacade.AppDeploymentData appDeploymentData = appDeploymentDataFacade.getAppDeploymentData(
+                distributionContext.getEnvironment(),
+                appConfig.getAppDeploymentPlan());
+
 
         ObjectNode objectNode = objectMapper.createObjectNode();
         objectNode.set("appConfig", appConfig.getConfig());
         objectNode.put("distributionName", distributionContext.getDistributionName().asString());
         objectNode.put("objectIdentifier", distributionContext.getObjectIdentifier().asString());
+        objectNode.put("appDeploymentPlan", appConfig.getAppDeploymentPlan());
+        objectNode.put("platformDistributionName", appDeploymentData.sourceDistributionName().asString());
+        objectNode.put("platformDistributionIdentifier", appDeploymentData.sourceObjectIdentifier().asString());
 
-
-        AppDeploymentDataFacade.AppDeploymentData appDeploymentData = appDeploymentDataFacade.getSfnArn(
-                distributionContext.getEnvironment(),
-                appConfig.getAppDeploymentPlan());
 
         sfnClient.startExecution(StartExecutionRequest.builder()
                                                       .input(objectNode.toString())

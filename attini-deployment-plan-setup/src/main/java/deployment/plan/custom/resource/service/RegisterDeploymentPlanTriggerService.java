@@ -7,10 +7,7 @@ package deployment.plan.custom.resource.service;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Map;
-
 import org.jboss.logging.Logger;
-
 import com.fasterxml.jackson.databind.JsonNode;
 
 import deployment.plan.custom.resource.CfnRequestType;

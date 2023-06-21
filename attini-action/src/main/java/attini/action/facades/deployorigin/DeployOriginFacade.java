@@ -28,7 +28,6 @@ import attini.domain.Version;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValueUpdate;
-import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
@@ -192,7 +191,6 @@ public class DeployOriginFacade {
                                                 .build())
                              .items()
                              .stream()
-                             .peek(stringAttributeValueMap -> System.out.println(stringAttributeValueMap.get("deploymentTime").n()))
                              .flatMap(stringAttributeValueMap -> stringAttributeValueMap.get("executionArns")
                                                                                         .m()
                                                                                         .values()

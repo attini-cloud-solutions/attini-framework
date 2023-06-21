@@ -11,7 +11,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import attini.action.App;
 import attini.action.SendUsageDataFacade;
 import attini.action.facades.artifactstore.ArtifactStoreFacade;
 import attini.action.facades.deployorigin.DeployOriginFacade;

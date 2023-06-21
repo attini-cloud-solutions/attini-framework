@@ -352,7 +352,9 @@ public class DeployStatesFacade {
                                                    .build());
     }
 
-    public void saveAppDeploymentData(DeploymentPlanResourceState deploymentPlanResourceState, String name) {
+    public void saveAppDeploymentData(DeploymentPlanResourceState deploymentPlanResourceState,
+                                      String name,
+                                      Map<String, String> stackParameters) {
         dynamoDbClient.putItem(PutItemRequest.builder()
                                              .tableName(environmentVariables.getResourceStatesTableName())
                                              .item(Map.of(
@@ -363,21 +365,47 @@ public class DeployStatesFacade {
                                                              .build(),
                                                      "name",
                                                      AttributeValue.builder()
-                                                                   .s("%s-%s".formatted(deploymentPlanResourceState.getEnvironment().asString(), name))
+                                                                   .s("%s-%s".formatted(deploymentPlanResourceState.getEnvironment()
+                                                                                                                   .asString(),
+                                                                                        name))
                                                                    .build(),
                                                      "distributionId",
-                                                     AttributeValue.builder().s(deploymentPlanResourceState.getDistributionId().asString()).build(),
+                                                     AttributeValue.builder()
+                                                                   .s(deploymentPlanResourceState.getDistributionId()
+                                                                                                 .asString())
+                                                                   .build(),
                                                      "distributionName",
-                                                     AttributeValue.builder().s(deploymentPlanResourceState.getDistributionName().asString()).build(),
+                                                     AttributeValue.builder()
+                                                                   .s(deploymentPlanResourceState.getDistributionName()
+                                                                                                 .asString())
+                                                                   .build(),
                                                      "environment",
-                                                     AttributeValue.builder().s(deploymentPlanResourceState.getEnvironment().asString()).build(),
+                                                     AttributeValue.builder()
+                                                                   .s(deploymentPlanResourceState.getEnvironment()
+                                                                                                 .asString())
+                                                                   .build(),
                                                      "attiniObjectIdentifier",
-                                                     AttributeValue.builder().s(deploymentPlanResourceState.getObjectIdentifier().asString()).build(),
+                                                     AttributeValue.builder()
+                                                                   .s(deploymentPlanResourceState.getObjectIdentifier()
+                                                                                                 .asString())
+                                                                   .build(),
                                                      "sfnArn",
-                                                     AttributeValue.builder().s(deploymentPlanResourceState.getSfnArn()).build(),
+                                                     AttributeValue.builder()
+                                                                   .s(deploymentPlanResourceState.getSfnArn())
+                                                                   .build(),
                                                      "stackName",
-                                                     AttributeValue.builder().s(deploymentPlanResourceState.getStackName()).build()
-                                                     ))
+                                                     AttributeValue.builder()
+                                                                   .s(deploymentPlanResourceState.getStackName())
+                                                                   .build(),
+                                                     "stackParameters",
+                                                     AttributeValue.builder()
+                                                                   .m(stackParameters.entrySet()
+                                                                                     .stream()
+                                                                                     .collect(Collectors.toMap(Map.Entry::getKey,
+                                                                                                               o -> AttributeValue.fromS(
+                                                                                                                       o.getValue()))))
+                                                                   .build()
+                                             ))
                                              .build());
     }
 

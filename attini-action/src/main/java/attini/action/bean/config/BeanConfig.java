@@ -6,6 +6,8 @@ import java.time.Duration;
 import attini.action.actions.getdeployorigindata.GetAppDeployOriginDataHandler;
 import attini.action.actions.posthook.PostPipelineHook;
 import attini.action.actions.sam.SamPackageRunnerAdapter;
+import attini.action.facades.stackdata.AppDeploymentPlanDataDynamoFacade;
+import attini.action.facades.stackdata.AppDeploymentPlanDataFacade;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -369,16 +371,24 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
+    public AppDeploymentPlanDataFacade appDeploymentPlanDataFacade(@CustomAwsClient DynamoDbClient dynamoDbClient,
+                                                                   EnvironmentVariables environmentVariables) {
+        return new AppDeploymentPlanDataDynamoFacade(dynamoDbClient, environmentVariables);
+    }
+
+    @ApplicationScoped
     public GetAppDeployOriginDataHandler getAppDeployOriginDataHandler(DeployOriginFacade deployOriginFacade,
                                                                        StepFunctionFacade stepFunctionFacade,
                                                                        DistributionDataFacade distributionDataFacade,
                                                                        ObjectMapper objectMapper,
-                                                                       DeploymentPlanDataFacade deploymentPlanDataFacade) {
+                                                                       DeploymentPlanDataFacade deploymentPlanDataFacade,
+                                                                       AppDeploymentPlanDataFacade appDeploymentPlanDataFacade) {
         return new GetAppDeployOriginDataHandler(deployOriginFacade,
                                                  stepFunctionFacade,
                                                  distributionDataFacade,
                                                  objectMapper,
-                                                 deploymentPlanDataFacade);
+                                                 deploymentPlanDataFacade,
+                                                 appDeploymentPlanDataFacade);
     }
 
     @ApplicationScoped
@@ -386,7 +396,7 @@ public class BeanConfig {
                                              SendUsageDataFacade sendUsageDataFacade,
                                              DeployOriginFacade deployOriginFacade,
                                              DeploymentPlanDataFacade deploymentPlanDataFacade,
-                                             ArtifactStoreFacade artifactStoreFacade){
+                                             ArtifactStoreFacade artifactStoreFacade) {
         return new PostPipelineHook(objectMapper,
                                     sendUsageDataFacade,
                                     deployOriginFacade,

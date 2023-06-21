@@ -16,7 +16,6 @@ import com.vdurmont.semver4j.Semver;
 import attini.deploy.origin.appdeployment.AppDeploymentFacade;
 import attini.deploy.origin.config.AttiniConfig;
 import attini.deploy.origin.config.DistributionDependency;
-import attini.deploy.origin.config.DistributionType;
 import attini.deploy.origin.config.InitDeployStackConfig;
 import attini.deploy.origin.deploystack.DeployDataFacade;
 import attini.deploy.origin.deploystack.DeployDataFacade.SaveDeploymentDataRequest;
@@ -99,11 +98,9 @@ public class InitDeployService {
 
 
             attiniConfig.getAppConfig()
-                        .ifPresent(appConfig -> {
-                            appDeploymentFacade.runAppDeploymentPlan(appConfig,
-                                                                     createDistributionContext(initDeployEvent, attiniConfig),
-                                                                     distributionData, deployTime);
-                        });
+                        .ifPresent(appConfig -> appDeploymentFacade.runAppDeploymentPlan(appConfig,
+                                                                                     createDistributionContext(initDeployEvent, attiniConfig),
+                                                                                     distributionData, deployTime));
 
 
             attiniConfig.getAttiniInitDeployStackConfig()

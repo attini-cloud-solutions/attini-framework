@@ -12,9 +12,7 @@ import java.util.stream.Collectors;
 
 import org.jboss.logging.Logger;
 
-import deployment.plan.custom.resource.StackType;
 import deployment.plan.transform.Runner;
-import software.amazon.awssdk.services.cloudformation.CloudFormationClient;
 
 public class RegisterDeployOriginDataService {
     private static final Logger logger = Logger.getLogger(RegisterDeployOriginDataService.class);
@@ -42,7 +40,7 @@ public class RegisterDeployOriginDataService {
             case UPDATE -> {
                 logger.info("Updating OriginDeployDataLink");
                 deployStatesFacade.deleteDeploymentPlanState(request.getOldSfnArn());
-                DeploymentPlanResourceState dataSourceUpdate = deploymentPlanStateFactory.create(request, INFRA);;
+                DeploymentPlanResourceState dataSourceUpdate = deploymentPlanStateFactory.create(request, INFRA);
                 logger.info("working with data source = " + dataSourceUpdate);
                 deployStatesFacade.saveDeploymentPlanState(dataSourceUpdate);
                 request.getRunners().forEach(runner -> deployStatesFacade.saveRunnerState(runner, dataSourceUpdate));

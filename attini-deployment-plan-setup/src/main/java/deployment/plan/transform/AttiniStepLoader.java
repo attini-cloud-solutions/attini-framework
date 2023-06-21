@@ -76,7 +76,7 @@ public class AttiniStepLoader {
         if (project.isMissingNode()) {
             throw new IllegalArgumentException("Project is missing in Sam step: " + stepName);
         }
-        if (project.path("Path").isMissingNode()) {
+        if (project.path("Path").isMissingNode() && project.path("Path.$").isMissingNode()) {
             throw new IllegalArgumentException("Project.Path is missing in Sam step: " + stepName);
         }
 
@@ -89,7 +89,7 @@ public class AttiniStepLoader {
 
         }
 
-        if (!project.path("Path").isTextual()) {
+        if (!project.path("Path").isTextual() && !project.path("Path.$").isTextual()) {
             throw new IllegalArgumentException("Project.Path in AttiniSam step should be a string, step: " + stepName);
         }
 

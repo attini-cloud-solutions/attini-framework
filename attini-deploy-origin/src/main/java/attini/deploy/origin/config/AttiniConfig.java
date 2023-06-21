@@ -7,7 +7,6 @@ import java.util.Optional;
 import attini.deploy.origin.appdeployment.AppConfig;
 import attini.domain.DistributionId;
 import attini.domain.DistributionName;
-import attini.domain.Environment;
 import attini.domain.Version;
 
 public interface AttiniConfig {

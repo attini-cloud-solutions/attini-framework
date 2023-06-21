@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Optional;
 
 import attini.deploy.origin.DistributionData;
-import attini.deploy.origin.config.DistributionType;
 import attini.domain.DistributionContext;
 import attini.domain.DistributionName;
 import attini.domain.Environment;
