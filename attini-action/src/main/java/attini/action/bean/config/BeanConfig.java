@@ -82,12 +82,10 @@ public class BeanConfig {
 
     @ApplicationScoped
     SamPackageRunnerAdapter samPackageRunnerAdapter(RunnerHandler runnerHandler,
-                                                    ArtifactStoreFacade artifactStoreFacade,
                                                     ResourceStateFacade resourceStateFacade,
                                                     StackConfigurationService stackConfigurationService,
                                                     StepFunctionFacade stepFunctionFacade) {
         return new SamPackageRunnerAdapter(runnerHandler,
-                                           artifactStoreFacade,
                                            resourceStateFacade,
                                            stackConfigurationService, stepFunctionFacade);
 
