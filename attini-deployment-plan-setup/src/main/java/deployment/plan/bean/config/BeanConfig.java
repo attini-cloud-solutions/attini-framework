@@ -19,6 +19,7 @@ import deployment.plan.transform.DeployData;
 import deployment.plan.transform.DeploymentPlanStepsCreator;
 import deployment.plan.transform.TemplateFileLoader;
 import deployment.plan.transform.TemplateFileLoaderImpl;
+import deployment.plan.transform.simplesyntax.TransformSimpleSyntax;
 import jakarta.enterprise.context.ApplicationScoped;
 import software.amazon.awssdk.auth.credentials.EnvironmentVariableCredentialsProvider;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
@@ -59,6 +60,11 @@ public class BeanConfig {
                                                                  DeployData deployData,
                                                                  ObjectMapper objectMapper) {
         return new DeploymentPlanStepsCreator(attiniStepLoader, deployData, objectMapper);
+    }
+
+    @ApplicationScoped
+    public TransformSimpleSyntax transformSimpleSyntax(ObjectMapper objectMapper){
+        return new TransformSimpleSyntax(objectMapper);
     }
 
     @ApplicationScoped

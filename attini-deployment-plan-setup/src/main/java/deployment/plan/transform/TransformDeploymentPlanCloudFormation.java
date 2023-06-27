@@ -24,9 +24,13 @@ import java.util.stream.Stream;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jboss.logging.Logger;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import deployment.plan.system.EnvironmentVariables;
+import deployment.plan.transform.simplesyntax.TransformSimpleSyntax;
 import jakarta.enterprise.context.ApplicationScoped;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 
@@ -43,15 +47,18 @@ public class TransformDeploymentPlanCloudFormation {
     private final Ec2Client ec2Client;
     private final ObjectMapper objectMapper;
     private final DeploymentPlanStepsCreator deploymentPlanStepsCreator;
+    private final TransformSimpleSyntax transformSimpleSyntax;
 
     public TransformDeploymentPlanCloudFormation(EnvironmentVariables environmentVariables,
                                                  Ec2Client ec2Client,
                                                  ObjectMapper objectMapper,
-                                                 DeploymentPlanStepsCreator deploymentPlanStepsCreator) {
+                                                 DeploymentPlanStepsCreator deploymentPlanStepsCreator,
+                                                 TransformSimpleSyntax transformSimpleSyntax) {
         this.environmentVariables = requireNonNull(environmentVariables, "environmentVariables");
         this.ec2Client = requireNonNull(ec2Client, "ec2Client");
         this.objectMapper = requireNonNull(objectMapper, "objectMapper");
-        this.deploymentPlanStepsCreator = deploymentPlanStepsCreator;
+        this.deploymentPlanStepsCreator = requireNonNull(deploymentPlanStepsCreator, "deploymentPlanStepsCreator");
+        this.transformSimpleSyntax = requireNonNull(transformSimpleSyntax, "transformSimpleSyntax");
     }
 
     public Map<String, Object> transformTemplate(Map<String, Object> input) {
@@ -75,6 +82,7 @@ public class TransformDeploymentPlanCloudFormation {
                                                                               Object parameters) {
 
         validateOnlyOneDeploymentPlan(resources);
+
 
         Optional<DeploymentPlanWrapper> deploymentPlanWrapper = getDeploymentPlanWrapper(resources);
 
@@ -140,14 +148,28 @@ public class TransformDeploymentPlanCloudFormation {
                                                                                                   .get(TYPE_KEY)
                                                                                                   .equals(ATTINI_APP_DEPLOY_DEPLOYMENT_PLAN_TYPE))
                         .findAny()
-                        .map(fromValue -> new DeploymentPlanWrapper(
-                                fromValue.getKey(),
-                                createDeploymentPlanResource(fromValue.getValue()),
-                                objectMapper,
-                                fromValue.getValue()
-                                         .get(TYPE_KEY)
-                                         .equals(ATTINI_INFRA_DEPLOY_DEPLOYMENT_PLAN_TYPE) ? INFRA : APP
-                        ));
+                        .map(fromValue -> {
+
+                            JsonNode jsonNode = objectMapper.valueToTree(fromValue);
+                            JsonNode deploymentPlan = jsonNode.path(fromValue.getKey()).path("Properties").path("DeploymentPlan");
+                            if (deploymentPlan.isArray()){
+                                logger.info("Transforming simple syntax");
+                                JsonNode transformedSteps = transformSimpleSyntax.transform(deploymentPlan);
+                                ObjectNode properties = (ObjectNode) jsonNode.path(fromValue.getKey()).path("Properties");
+                                properties.set("DeploymentPlan",transformedSteps);
+                            }
+                           return new DeploymentPlanWrapper(
+                                    fromValue.getKey(),
+                                    createDeploymentPlanResource(jsonNode.path(fromValue.getKey())),
+                                    objectMapper,
+                                    fromValue.getValue()
+                                             .get(TYPE_KEY)
+                                             .equals(ATTINI_INFRA_DEPLOY_DEPLOYMENT_PLAN_TYPE) ? INFRA : APP
+                            );
+                        }).map(deploymentPlanWrapper -> {
+                    System.out.println(deploymentPlanWrapper);
+                    return deploymentPlanWrapper;
+                });
     }
 
     private static void validateOnlyOneDeploymentPlan(Map<String, Map<String, Object>> resources) {
@@ -179,15 +201,15 @@ public class TransformDeploymentPlanCloudFormation {
                                                   Entry::getValue));
     }
 
-    private DeploymentPlanResource createDeploymentPlanResource(Object fromValue) {
+    private DeploymentPlanResource createDeploymentPlanResource(JsonNode fromValue) {
         try {
-            return objectMapper.convertValue(fromValue, DeploymentPlanResource.class);
-        } catch (IllegalArgumentException e) {
+            return objectMapper.treeToValue(fromValue, DeploymentPlanResource.class);
+        } catch (IllegalArgumentException | JsonProcessingException e) {
             Throwable rootCause = ExceptionUtils.getRootCause(e);
             if (rootCause instanceof IllegalArgumentException cause) {
                 throw cause;
             }
-            throw e;
+            throw new IllegalArgumentException(e.getMessage(), e.getCause());
         }
     }
 
