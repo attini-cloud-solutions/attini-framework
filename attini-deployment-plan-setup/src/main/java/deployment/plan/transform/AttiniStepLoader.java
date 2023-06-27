@@ -112,16 +112,25 @@ public class AttiniStepLoader {
 
     }
 
+    private String getPathKey(JsonNode jsonNode){
+        if (!jsonNode.path("Properties").path("Path.$").isMissingNode()){
+            return "Path.$";
+        }
+
+        return "Path";
+    }
+
     public Map<AttiniStep, JsonNode> getAttiniCdk(JsonNode originalStep,
                                                   String stepName,
                                                   Map<String, String> nextReplacements, String defaultRunner) {
-        JsonNode path = originalStep.path("Properties").path("Path");
+        String pathKey = getPathKey(originalStep);
+        JsonNode path = originalStep.path("Properties").path(pathKey);
         if (path.isMissingNode() || path.asText().isBlank()) {
             ObjectNode properties = (ObjectNode) originalStep.get("Properties");
-            properties.put("Path", "./");
+            properties.put(pathKey, "./");
         } else if (path.asText().startsWith("/")) {
             ObjectNode properties = (ObjectNode) originalStep.get("Properties");
-            properties.put("Path", "." + properties.get("Path").asText());
+            properties.put(pathKey, "." + properties.get(pathKey).asText());
         }
 
 
