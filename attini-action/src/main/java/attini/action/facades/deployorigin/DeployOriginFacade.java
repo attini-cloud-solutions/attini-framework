@@ -44,7 +44,7 @@ public class DeployOriginFacade {
     }
 
 
-    public void setDeploymentPlanStatus(String deployName, ObjectIdentifier objectIdentifier, String status) {
+    public void setDeploymentPlanStatus(DeploymentName deployName, ObjectIdentifier objectIdentifier, String status) {
 
         logger.info("Setting execution status: " + status);
 
@@ -73,7 +73,7 @@ public class DeployOriginFacade {
 
     public void setSfnExecutionArn(String executionArn,
                                    ObjectIdentifier objectIdentifier,
-                                   String deploymentSourceName) {
+                                   DeploymentName deploymentSourceName) {
 
         logger.info("Setting execution arn");
 
@@ -106,7 +106,7 @@ public class DeployOriginFacade {
         return removedExecutionId.substring(removedExecutionId.lastIndexOf(":") + 1);
     }
 
-    public void addExecutionError(String deployName,
+    public void addExecutionError(DeploymentName deployName,
                                   ObjectIdentifier objectIdentifier,
                                   String errorMessage,
                                   String errorCode) {
@@ -143,7 +143,7 @@ public class DeployOriginFacade {
 
     }
 
-    public DistributionContext getContext(String executionArn, String deploymentName) {
+    public DistributionContext getContext(String executionArn, DeploymentName deploymentName) {
         QueryRequest queryRequest = QueryRequest.builder()
                                                 .tableName(environmentVariables.getDeployOriginTableName())
                                                 .keyConditionExpression(
@@ -151,7 +151,7 @@ public class DeployOriginFacade {
                                                 .expressionAttributeValues(Map.of(
                                                         ":v_deployName",
                                                         AttributeValue.builder()
-                                                                      .s(deploymentName)
+                                                                      .s(deploymentName.deploymentName())
                                                                       .build()))
                                                 .build();
 
@@ -177,7 +177,7 @@ public class DeployOriginFacade {
 
     }
 
-    public Set<String> getLatestExecutionArns(String deploymentName) {
+    public Set<String> getLatestExecutionArns(DeploymentName deploymentName) {
 
         logger.info("Getting latest executions for deployment: " + deploymentName);
         return dynamoDbClient.query(QueryRequest.builder()
@@ -185,7 +185,7 @@ public class DeployOriginFacade {
                                                 .tableName(environmentVariables.getDeployOriginTableName())
                                                 .keyConditionExpression("deploymentName = :v_deploymentName")
                                                 .expressionAttributeValues(Map.of(":v_deploymentName",
-                                                                                  AttributeValue.fromS(deploymentName)))
+                                                                                  AttributeValue.fromS(deploymentName.deploymentName())))
                                                 .limit(5)
                                                 .scanIndexForward(false)
                                                 .build())
@@ -199,7 +199,7 @@ public class DeployOriginFacade {
                              .collect(Collectors.toSet());
     }
 
-    public DeployOriginData getDeployOriginData(ObjectIdentifier objectIdentifier, String deploymentName) {
+    public DeployOriginData getDeployOriginData(ObjectIdentifier objectIdentifier, DeploymentName deploymentName) {
 
         QueryRequest queryRequest = QueryRequest.builder()
                                                 .indexName("objectIdentifier")
@@ -212,7 +212,7 @@ public class DeployOriginFacade {
                                                                                                 .build(),
                                                                                   ":v_deployName",
                                                                                   AttributeValue.builder()
-                                                                                                .s(deploymentName)
+                                                                                                .s(deploymentName.deploymentName())
                                                                                                 .build()))
                                                 .build();
 
@@ -261,9 +261,9 @@ public class DeployOriginFacade {
                                             entry -> entry.getValue().s()));
     }
 
-    private static Map<String, AttributeValue> createKey(String sourceName, String deployTime) {
+    private static Map<String, AttributeValue> createKey(DeploymentName sourceName, String deployTime) {
         return Map.of("deploymentName", AttributeValue.builder()
-                                                      .s(sourceName)
+                                                      .s(sourceName.deploymentName())
                                                       .build(),
                       "deploymentTime", AttributeValue.builder()
                                                       .n(deployTime)
@@ -271,7 +271,7 @@ public class DeployOriginFacade {
     }
 
 
-    private List<DeployTimeAndArns> getDeployTimes(String sourceName, ObjectIdentifier objectIdentifier) {
+    private List<DeployTimeAndArns> getDeployTimes(DeploymentName sourceName, ObjectIdentifier objectIdentifier) {
         QueryRequest queryRequest = QueryRequest.builder()
                                                 .indexName("objectIdentifier")
                                                 .tableName(environmentVariables.getDeployOriginTableName())
@@ -283,7 +283,7 @@ public class DeployOriginFacade {
                                                                                                 .build(),
                                                                                   ":v_deployName",
                                                                                   AttributeValue.builder()
-                                                                                                .s(sourceName)
+                                                                                                .s(sourceName.deploymentName())
                                                                                                 .build()))
                                                 .projectionExpression("deploymentTime, executionArns")
                                                 .build();

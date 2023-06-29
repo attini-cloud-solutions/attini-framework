@@ -4,6 +4,7 @@ import java.net.URI;
 import java.time.Duration;
 
 import attini.action.actions.getdeployorigindata.GetAppDeployOriginDataHandler;
+import attini.action.actions.getdeployorigindata.dependencies.DependencyFacade;
 import attini.action.actions.posthook.PostPipelineHook;
 import attini.action.actions.sam.SamPackageRunnerAdapter;
 import attini.action.facades.stackdata.AppDeploymentPlanDataDynamoFacade;
@@ -353,19 +354,19 @@ public class BeanConfig {
     public GetDeployOriginDataHandler getDeployOriginDataHandler(DeployOriginFacade deployOriginFacade,
                                                                  StepFunctionFacade stepFunctionFacade,
                                                                  SendUsageDataFacade sendUsageDataFacade,
-                                                                 DistributionDataFacade distributionDataFacade,
                                                                  ObjectMapper objectMapper,
                                                                  InitStackDataFacade initStackDataFacade,
                                                                  DeploymentPlanDataFacade deploymentPlanDataFacade,
-                                                                 @CustomAwsClient CloudFormationClient cloudFormationClient) {
+                                                                 @CustomAwsClient CloudFormationClient cloudFormationClient,
+                                                                 DependencyFacade dependencyFacade) {
         return new GetDeployOriginDataHandler(deployOriginFacade,
                                               stepFunctionFacade,
                                               cloudFormationClient,
                                               sendUsageDataFacade,
-                                              distributionDataFacade,
                                               initStackDataFacade,
                                               objectMapper,
-                                              deploymentPlanDataFacade);
+                                              deploymentPlanDataFacade,
+                                              dependencyFacade);
     }
 
     @ApplicationScoped
@@ -375,18 +376,23 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
+    public DependencyFacade dependenciesFacade(DistributionDataFacade distributionDataFacade){
+        return new DependencyFacade(distributionDataFacade);
+
+    }
+
+    @ApplicationScoped
     public GetAppDeployOriginDataHandler getAppDeployOriginDataHandler(DeployOriginFacade deployOriginFacade,
                                                                        StepFunctionFacade stepFunctionFacade,
-                                                                       DistributionDataFacade distributionDataFacade,
                                                                        ObjectMapper objectMapper,
                                                                        DeploymentPlanDataFacade deploymentPlanDataFacade,
-                                                                       AppDeploymentPlanDataFacade appDeploymentPlanDataFacade) {
+                                                                       AppDeploymentPlanDataFacade appDeploymentPlanDataFacade,
+                                                                       DependencyFacade dependencyFacade) {
         return new GetAppDeployOriginDataHandler(deployOriginFacade,
                                                  stepFunctionFacade,
-                                                 distributionDataFacade,
                                                  objectMapper,
                                                  deploymentPlanDataFacade,
-                                                 appDeploymentPlanDataFacade);
+                                                 appDeploymentPlanDataFacade, dependencyFacade);
     }
 
     @ApplicationScoped

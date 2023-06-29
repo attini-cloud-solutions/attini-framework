@@ -2,6 +2,7 @@ package attini.action.domain;
 
 import static java.util.Objects.requireNonNull;
 
+import attini.action.facades.deployorigin.DeploymentName;
 import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
 import lombok.EqualsAndHashCode;
@@ -10,13 +11,13 @@ import lombok.ToString;
 @EqualsAndHashCode
 @ToString
 public class DeploymentPlanStateData {
-    private final String deployOriginSourceName;
+    private final DeploymentName deployOriginSourceName;
     private final Environment environment;
     private final ObjectIdentifier objectIdentifier;
 
     private final String payloadDefaults;
 
-    public DeploymentPlanStateData(String deployOriginSourceName,
+    public DeploymentPlanStateData(DeploymentName deployOriginSourceName,
                                    ObjectIdentifier objectIdentifier,
                                    String payloadDefaults,
                                    Environment environment) {
@@ -26,7 +27,7 @@ public class DeploymentPlanStateData {
         this.environment = requireNonNull(environment, "environment");
     }
 
-    public String getDeployOriginSourceName() {
+    public DeploymentName getDeployOriginSourceName() {
         return deployOriginSourceName;
     }
 

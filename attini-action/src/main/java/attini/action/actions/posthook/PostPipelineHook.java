@@ -14,8 +14,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import attini.action.SendUsageDataFacade;
 import attini.action.facades.artifactstore.ArtifactStoreFacade;
 import attini.action.facades.deployorigin.DeployOriginFacade;
+import attini.action.facades.deployorigin.DeploymentName;
 import attini.action.facades.stackdata.DeploymentPlanDataFacade;
 import attini.domain.DistributionContext;
+import attini.domain.DistributionName;
+import attini.domain.Environment;
 
 public class PostPipelineHook {
 
@@ -55,13 +58,12 @@ public class PostPipelineHook {
                                                                                       .get("startDate")
                                                                                       .asText())));
 
-        String deployOriginSourceName = getDeployOriginSourceName(jsonNode);
+        DeploymentName deployOriginSourceName = getDeployOriginSourceName(jsonNode);
 
         DistributionContext context = deployOriginFacade.getContext(jsonNode.get("detail")
                                                                             .get("executionArn")
                                                                             .asText(),
                                                                     deployOriginSourceName);
-
 
 
         if ("SUCCEEDED".equals(jsonNode.path("detail")
@@ -82,20 +84,23 @@ public class PostPipelineHook {
         }
     }
 
-    private String getDeployOriginSourceName(JsonNode input) {
+    private DeploymentName getDeployOriginSourceName(JsonNode input) {
         try {
             JsonNode deploymentPlanInput = objectMapper.readTree(input.get("detail")
-                                                                       .get("input")
-                                                                       .asText());
+                                                                      .get("input")
+                                                                      .asText());
 
             if (deploymentPlanInput.has("distributionName")) {
-                String distributionName = deploymentPlanInput.get("distributionName").asText();
-                String objectIdentifier = deploymentPlanInput.get("objectIdentifier").asText();
-                return "%s-%s".formatted(objectIdentifier.split("/")[0], distributionName);
+                DistributionName distributionName = DistributionName.of(deploymentPlanInput.get("distributionName")
+                                                                                           .asText());
+                Environment environment = Environment.of(deploymentPlanInput.get("objectIdentifier")
+                                                                            .asText()
+                                                                            .split("/")[0]);
+                return DeploymentName.create(environment, distributionName);
             }
 
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         }
         return deploymentPlanDataFacade.getDeploymentPlan(input.get("detail")
                                                                .get("stateMachineArn")

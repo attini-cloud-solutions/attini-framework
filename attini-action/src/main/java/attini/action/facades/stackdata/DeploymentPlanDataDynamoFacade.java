@@ -7,7 +7,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import attini.action.domain.DeploymentPlanStateData;
+import attini.action.facades.deployorigin.DeploymentName;
 import attini.action.system.EnvironmentVariables;
+import attini.domain.DistributionName;
 import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -73,9 +75,7 @@ public class DeploymentPlanDataDynamoFacade implements DeploymentPlanDataFacade 
         deployOriginSourceNames.put("DistributionName", getItemResponse.item().get("distributionName").s());
         String environment = getItemResponse.item().get("environment").s();
         deployOriginSourceNames.put("EnvironmentName", environment);
-        String sourceName = String.format("%s-%s",
-                                          deployOriginSourceNames.get("EnvironmentName"),
-                                          deployOriginSourceNames.get("DistributionName"));
+        DeploymentName sourceName = DeploymentName.create(Environment.of( deployOriginSourceNames.get("EnvironmentName")), DistributionName.of(deployOriginSourceNames.get("DistributionName")));
         String payloadDefaults = getItemResponse.item().get("payloadDefaults") != null ? getItemResponse.item()
                                                                                           .get("payloadDefaults")
                                                                                           .s() : "{}"; //default value is strictly for backward compatability, would throw en exception if someone would rerun an old deployment plan

@@ -112,29 +112,31 @@ public class AttiniStepLoader {
 
     }
 
-    private String getPathKey(JsonNode jsonNode){
-        if (!jsonNode.path("Properties").path("Path.$").isMissingNode()){
-            return "Path.$";
+    private String geKey(JsonNode jsonNode, String key){
+        String jsonPathKeyName = key + ".$";
+        if (!jsonNode.path(jsonPathKeyName).isMissingNode()){
+            return jsonPathKeyName;
         }
 
-        return "Path";
+        return key;
     }
 
     public Map<AttiniStep, JsonNode> getAttiniCdk(JsonNode originalStep,
                                                   String stepName,
                                                   Map<String, String> nextReplacements, String defaultRunner) {
-        String pathKey = getPathKey(originalStep);
-        JsonNode path = originalStep.path("Properties").path(pathKey);
+        JsonNode properties = originalStep.path("Properties");
+        String pathKey = geKey(properties, "Path");
+        JsonNode path = properties.path(pathKey);
         if (path.isMissingNode() || path.asText().isBlank()) {
-            ObjectNode properties = (ObjectNode) originalStep.get("Properties");
-            properties.put(pathKey, "./");
+            ObjectNode propertiesObjectNode = (ObjectNode) originalStep.get("Properties");
+            propertiesObjectNode.put(pathKey, "./");
         } else if (path.asText().startsWith("/")) {
-            ObjectNode properties = (ObjectNode) originalStep.get("Properties");
-            properties.put(pathKey, "." + properties.get(pathKey).asText());
+            ObjectNode propertiesObjectNode = (ObjectNode) originalStep.get("Properties");
+            propertiesObjectNode.put(pathKey, "." + properties.get(pathKey).asText());
         }
 
 
-        JsonNode diffNode = originalStep.path("Properties").path("Diff");
+        JsonNode diffNode = properties.path(geKey(properties, "Diff"));
 
         if (!diffNode.isMissingNode() && diffNode.isValueNode()) {
             throw new IllegalArgumentException("\"Diff\" in the AttiniCdk step should be an object.");

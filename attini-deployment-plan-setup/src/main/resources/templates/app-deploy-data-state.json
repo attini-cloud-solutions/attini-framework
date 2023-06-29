@@ -7,6 +7,8 @@
     "payload.$": "$",
     "distributionName.$": "$.distributionName",
     "objectIdentifier.$": "$.objectIdentifier",
+    "platformDistributionName.$": "$.platformDistributionName",
+    "platformDistributionIdentifier.$": "$.platformDistributionIdentifier",
     "appConfig.$": "$.appConfig",
     "attiniActionType": "GetAppDeployOriginData",
     "sfnArn.$": "$$.StateMachine.Id",
