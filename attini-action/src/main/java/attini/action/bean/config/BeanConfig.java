@@ -3,7 +3,12 @@ package attini.action.bean.config;
 import java.net.URI;
 import java.time.Duration;
 
+import attini.action.actions.getdeployorigindata.GetAppDeployOriginDataHandler;
+import attini.action.actions.getdeployorigindata.dependencies.DependencyFacade;
+import attini.action.actions.posthook.PostPipelineHook;
 import attini.action.actions.sam.SamPackageRunnerAdapter;
+import attini.action.facades.stackdata.AppDeploymentPlanDataDynamoFacade;
+import attini.action.facades.stackdata.AppDeploymentPlanDataFacade;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -78,12 +83,10 @@ public class BeanConfig {
 
     @ApplicationScoped
     SamPackageRunnerAdapter samPackageRunnerAdapter(RunnerHandler runnerHandler,
-                                                    ArtifactStoreFacade artifactStoreFacade,
                                                     ResourceStateFacade resourceStateFacade,
                                                     StackConfigurationService stackConfigurationService,
                                                     StepFunctionFacade stepFunctionFacade) {
         return new SamPackageRunnerAdapter(runnerHandler,
-                                           artifactStoreFacade,
                                            resourceStateFacade,
                                            stackConfigurationService, stepFunctionFacade);
 
@@ -107,7 +110,7 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
-    public EcsFacade ecsFacade(EnvironmentVariables environmentVariables, ResourceStateFacade resourceStateFacade ) {
+    public EcsFacade ecsFacade(EnvironmentVariables environmentVariables, ResourceStateFacade resourceStateFacade) {
         return new EcsFacade(EcsClient.create(), environmentVariables, resourceStateFacade);
     }
 
@@ -351,19 +354,58 @@ public class BeanConfig {
     public GetDeployOriginDataHandler getDeployOriginDataHandler(DeployOriginFacade deployOriginFacade,
                                                                  StepFunctionFacade stepFunctionFacade,
                                                                  SendUsageDataFacade sendUsageDataFacade,
-                                                                 DistributionDataFacade distributionDataFacade,
                                                                  ObjectMapper objectMapper,
                                                                  InitStackDataFacade initStackDataFacade,
                                                                  DeploymentPlanDataFacade deploymentPlanDataFacade,
-                                                                 @CustomAwsClient CloudFormationClient cloudFormationClient) {
+                                                                 @CustomAwsClient CloudFormationClient cloudFormationClient,
+                                                                 DependencyFacade dependencyFacade) {
         return new GetDeployOriginDataHandler(deployOriginFacade,
                                               stepFunctionFacade,
                                               cloudFormationClient,
                                               sendUsageDataFacade,
-                                              distributionDataFacade,
                                               initStackDataFacade,
                                               objectMapper,
-                                              deploymentPlanDataFacade);
+                                              deploymentPlanDataFacade,
+                                              dependencyFacade);
+    }
+
+    @ApplicationScoped
+    public AppDeploymentPlanDataFacade appDeploymentPlanDataFacade(@CustomAwsClient DynamoDbClient dynamoDbClient,
+                                                                   EnvironmentVariables environmentVariables) {
+        return new AppDeploymentPlanDataDynamoFacade(dynamoDbClient, environmentVariables);
+    }
+
+    @ApplicationScoped
+    public DependencyFacade dependenciesFacade(DistributionDataFacade distributionDataFacade){
+        return new DependencyFacade(distributionDataFacade);
+
+    }
+
+    @ApplicationScoped
+    public GetAppDeployOriginDataHandler getAppDeployOriginDataHandler(DeployOriginFacade deployOriginFacade,
+                                                                       StepFunctionFacade stepFunctionFacade,
+                                                                       ObjectMapper objectMapper,
+                                                                       DeploymentPlanDataFacade deploymentPlanDataFacade,
+                                                                       AppDeploymentPlanDataFacade appDeploymentPlanDataFacade,
+                                                                       DependencyFacade dependencyFacade) {
+        return new GetAppDeployOriginDataHandler(deployOriginFacade,
+                                                 stepFunctionFacade,
+                                                 objectMapper,
+                                                 deploymentPlanDataFacade,
+                                                 appDeploymentPlanDataFacade, dependencyFacade);
+    }
+
+    @ApplicationScoped
+    public PostPipelineHook postPipelineHook(ObjectMapper objectMapper,
+                                             SendUsageDataFacade sendUsageDataFacade,
+                                             DeployOriginFacade deployOriginFacade,
+                                             DeploymentPlanDataFacade deploymentPlanDataFacade,
+                                             ArtifactStoreFacade artifactStoreFacade) {
+        return new PostPipelineHook(objectMapper,
+                                    sendUsageDataFacade,
+                                    deployOriginFacade,
+                                    deploymentPlanDataFacade,
+                                    artifactStoreFacade);
     }
 
     @ApplicationScoped

@@ -17,9 +17,4 @@ public class DeployInitStackException extends RuntimeException {
         AwsServiceException awsServiceException = (AwsServiceException) this.getCause();
         return awsServiceException.awsErrorDetails().errorCode();
     }
-
-    @Override
-    public int hashCode() {
-        return super.hashCode();
-    }
 }

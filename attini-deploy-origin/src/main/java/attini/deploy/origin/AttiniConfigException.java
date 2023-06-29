@@ -31,6 +31,6 @@ public class AttiniConfigException extends RuntimeException {
     }
 
     public enum ErrorCode{
-        INVALID_FORMAT, UNKNOWN, INVALID_PARAMETER_CONFIG
+        INVALID_FORMAT, UNKNOWN, INVALID_PARAMETER_CONFIG, INVALID_INPUT
     }
 }

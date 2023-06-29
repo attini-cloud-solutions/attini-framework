@@ -2,14 +2,17 @@ package attini.action.facades.stepfunction;
 
 import static java.util.Objects.requireNonNull;
 
+import attini.domain.DistributionId;
+import attini.domain.DistributionName;
+import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
 
 public class ExecutionSummery {
 
     private final int nrOfSteps;
-    private final String environment;
-    private final String distributionName;
-    private final String distributionId;
+    private final Environment environment;
+    private final DistributionName distributionName;
+    private final DistributionId distributionId;
     private final ObjectIdentifier objectIdentifier;
 
     private ExecutionSummery(Builder builder) {
@@ -29,15 +32,15 @@ public class ExecutionSummery {
         return nrOfSteps;
     }
 
-    public String getEnvironment() {
+    public Environment getEnvironment() {
         return environment;
     }
 
-    public String getDistributionName() {
+    public DistributionName getDistributionName() {
         return distributionName;
     }
 
-    public String getDistributionId() {
+    public DistributionId getDistributionId() {
         return distributionId;
     }
 
@@ -47,9 +50,9 @@ public class ExecutionSummery {
 
     public static class Builder {
         private Integer nrOfSteps;
-        private String environment;
-        private String distributionName;
-        private String distributionId;
+        private Environment environment;
+        private DistributionName distributionName;
+        private DistributionId distributionId;
         private ObjectIdentifier objectIdentifier;
 
         private Builder() {
@@ -60,17 +63,17 @@ public class ExecutionSummery {
             return this;
         }
 
-        public Builder setEnvironment(String environment) {
+        public Builder setEnvironment(Environment environment) {
             this.environment = environment;
             return this;
         }
 
-        public Builder setDistributionName(String distributionName) {
+        public Builder setDistributionName(DistributionName distributionName) {
             this.distributionName = distributionName;
             return this;
         }
 
-        public Builder setDistributionId(String distributionId){
+        public Builder setDistributionId(DistributionId distributionId){
             this.distributionId = distributionId;
             return this;
         }

@@ -1,7 +1,5 @@
 package attini.action.actions.sam;
 
-import attini.action.facades.artifactstore.SamMetadata;
-
 public class PackageSamScript {
 
     private final static String PACKAGE_SAM_SCRIPT = """
@@ -20,10 +18,10 @@ public class PackageSamScript {
                         
             """;
 
-    public static String getPackageSamScript(SamMetadata samMetadata) {
+    public static String getPackageSamScript(String path, String buildDir) {
 
-        return PACKAGE_SAM_SCRIPT.formatted(samMetadata.path().substring(1),
-                                            samMetadata.buildDir());
+        return PACKAGE_SAM_SCRIPT.formatted(path,
+                                            buildDir);
     }
 
 }

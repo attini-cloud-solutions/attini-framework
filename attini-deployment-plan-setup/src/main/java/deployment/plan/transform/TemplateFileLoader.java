@@ -10,6 +10,8 @@ import java.io.File;
 public interface TemplateFileLoader {
     File getDeployStateTemplate();
 
+    File getAppDeployStateTemplate();
+
     File getAttiniCfnTemplate();
 
     File getAttiniLambdaInvokeTemplate();

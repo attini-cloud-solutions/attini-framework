@@ -62,4 +62,5 @@ public class RegisterDeployOriginDataRequest {
     public Map<String, Object> getPayloadDefaults() {
         return payloadDefaults;
     }
+
 }

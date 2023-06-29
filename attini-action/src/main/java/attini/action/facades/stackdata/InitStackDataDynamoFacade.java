@@ -23,20 +23,23 @@ public class InitStackDataDynamoFacade implements InitStackDataFacade {
 
     @Override
     public Map<String, String> getInitConfigVariables(String initStackName) {
-        return dynamoDbClient.getItem(GetItemRequest.builder()
-                                                    .tableName(environmentVariables.getResourceStatesTableName())
-                                                    .key(Map.of("resourceType",
-                                                                AttributeValue.builder()
-                                                                              .s("InitDeployCloudformationStack")
-                                                                              .build(),
-                                                                "name",
-                                                                AttributeValue.builder()
-                                                                              .s(initStackName)
-                                                                              .build()))
-                                                    .build())
-                             .item()
-                             .get("variables")
-                             .m()
+        AttributeValue attributeValue = dynamoDbClient.getItem(GetItemRequest.builder()
+                                                                             .tableName(environmentVariables.getResourceStatesTableName())
+                                                                             .key(Map.of("resourceType",
+                                                                                         AttributeValue.builder()
+                                                                                                       .s("InitDeployCloudformationStack")
+                                                                                                       .build(),
+                                                                                         "name",
+                                                                                         AttributeValue.builder()
+                                                                                                       .s(initStackName)
+                                                                                                       .build()))
+                                                                             .build())
+                                                      .item()
+                                                      .get("variables");
+        if (attributeValue == null) {
+            return Collections.emptyMap();
+        }
+        return attributeValue.m()
                              .entrySet()
                              .stream()
                              .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().s()));
@@ -58,7 +61,7 @@ public class InitStackDataDynamoFacade implements InitStackDataFacade {
                                                        .item()
                                                        .get("stackParameters");
 
-        if (stackParameters == null){
+        if (stackParameters == null) {
             return Collections.emptyMap(); //  null check to maintain backwards compatability
         }
         return stackParameters.m()

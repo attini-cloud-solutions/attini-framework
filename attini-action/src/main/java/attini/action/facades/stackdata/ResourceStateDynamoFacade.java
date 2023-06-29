@@ -58,6 +58,9 @@ public class ResourceStateDynamoFacade implements ResourceStateFacade {
 
 
         Map<String, AttributeValue> item = response.item();
+        if (item.isEmpty()){
+            throw new IllegalArgumentException("No runner found with name "+ runnerName+ " for stack: " + stackName);
+        }
         return RunnerDataConverter.convert(item);
     }
 

@@ -15,15 +15,18 @@ public class DeploymentPlanWrapper {
     private final String deploymentPlanName;
     private final DeploymentPlanResource deploymentPlanResource;
     private final boolean containsSamSteps;
-
     private final boolean containsRunnerStepsWithoutRunner;
+
+    private final DeploymentPlanType deploymentPlanType;
 
 
     public DeploymentPlanWrapper(String deploymentPlanName,
                                  DeploymentPlanResource deploymentPlanResource,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper,
+                                 DeploymentPlanType deploymentPlanType) {
         this.deploymentPlanName = requireNonNull(deploymentPlanName, "name");
         this.deploymentPlanResource = requireNonNull(deploymentPlanResource, "deploymentPlanResource");
+        this.deploymentPlanType = requireNonNull(deploymentPlanType, "deploymentPlanType");
         JsonNode source = objectMapper.valueToTree(deploymentPlanResource.getDeploymentPlanProperties()
                                                                          .getDeploymentPlan());
         this.containsSamSteps = findSteps(source,
@@ -50,8 +53,14 @@ public class DeploymentPlanWrapper {
     public DeploymentPlanResource getDeploymentPlanResource() {
         return deploymentPlanResource;
     }
+
     public boolean shouldDeployDefaultRunner() {
-        return (containsSamSteps || containsRunnerStepsWithoutRunner) && !deploymentPlanResource.getDeploymentPlanProperties().hasCustomDefaultRunner();
+        return (containsSamSteps || containsRunnerStepsWithoutRunner) && !deploymentPlanResource.getDeploymentPlanProperties()
+                                                                                                .hasCustomDefaultRunner();
+    }
+
+    public DeploymentPlanType getDeploymentPlanType() {
+        return deploymentPlanType;
     }
 
     private static Stream<Map.Entry<String, JsonNode>> findSteps(JsonNode source, String type) {
@@ -74,6 +83,10 @@ public class DeploymentPlanWrapper {
 
     private static Iterable<Map.Entry<String, JsonNode>> getFieldIterable(JsonNode source) {
         return source::fields;
+    }
+
+    public enum DeploymentPlanType {
+        INFRA, APP
     }
 
 }

@@ -5,6 +5,8 @@
 
 package deployment.plan.transform;
 
+import static deployment.plan.transform.DeploymentPlanWrapper.DeploymentPlanType.APP;
+import static deployment.plan.transform.DeploymentPlanWrapper.DeploymentPlanType.INFRA;
 import static deployment.plan.transform.ObjectTypeUtil.isMap;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
@@ -22,9 +24,13 @@ import java.util.stream.Stream;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jboss.logging.Logger;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import deployment.plan.system.EnvironmentVariables;
+import deployment.plan.transform.simplesyntax.TransformSimpleSyntax;
 import jakarta.enterprise.context.ApplicationScoped;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 
@@ -34,20 +40,25 @@ public class TransformDeploymentPlanCloudFormation {
     private static final Logger logger = Logger.getLogger(TransformDeploymentPlanCloudFormation.class);
 
     private static final String TYPE_KEY = "Type";
-    public static final String ATTINI_DEPLOY_DEPLOYMENT_PLAN_TYPE = "Attini::Deploy::DeploymentPlan";
+    public static final String ATTINI_INFRA_DEPLOY_DEPLOYMENT_PLAN_TYPE = "Attini::Deploy::DeploymentPlan";
+    public static final String ATTINI_APP_DEPLOY_DEPLOYMENT_PLAN_TYPE = "Attini::Deploy::AppDeploymentPlan";
+
     private final EnvironmentVariables environmentVariables;
     private final Ec2Client ec2Client;
     private final ObjectMapper objectMapper;
     private final DeploymentPlanStepsCreator deploymentPlanStepsCreator;
+    private final TransformSimpleSyntax transformSimpleSyntax;
 
     public TransformDeploymentPlanCloudFormation(EnvironmentVariables environmentVariables,
                                                  Ec2Client ec2Client,
                                                  ObjectMapper objectMapper,
-                                                 DeploymentPlanStepsCreator deploymentPlanStepsCreator) {
+                                                 DeploymentPlanStepsCreator deploymentPlanStepsCreator,
+                                                 TransformSimpleSyntax transformSimpleSyntax) {
         this.environmentVariables = requireNonNull(environmentVariables, "environmentVariables");
         this.ec2Client = requireNonNull(ec2Client, "ec2Client");
         this.objectMapper = requireNonNull(objectMapper, "objectMapper");
-        this.deploymentPlanStepsCreator = deploymentPlanStepsCreator;
+        this.deploymentPlanStepsCreator = requireNonNull(deploymentPlanStepsCreator, "deploymentPlanStepsCreator");
+        this.transformSimpleSyntax = requireNonNull(transformSimpleSyntax, "transformSimpleSyntax");
     }
 
     public Map<String, Object> transformTemplate(Map<String, Object> input) {
@@ -71,6 +82,7 @@ public class TransformDeploymentPlanCloudFormation {
                                                                               Object parameters) {
 
         validateOnlyOneDeploymentPlan(resources);
+
 
         Optional<DeploymentPlanWrapper> deploymentPlanWrapper = getDeploymentPlanWrapper(resources);
 
@@ -117,14 +129,12 @@ public class TransformDeploymentPlanCloudFormation {
         String sfnResourceName = String.format("AttiniDeploymentPlanSfn%s",
                                                deploymentPlan.getDeploymentPlanName());
         return Map.of(sfnResourceName,
-                      createStateMachineResource(deploymentPlan.getDeploymentPlanResource()),
+                      createStateMachineResource(deploymentPlan),
                       String.format("%sTrigger", sfnResourceName),
                       createDeploymentPlanTrigger(sfnResourceName,
                                                   attiniRunners,
                                                   parameters,
-                                                  deploymentPlan.getDeploymentPlanResource()
-                                                                .getDeploymentPlanProperties()
-                                                                .getPayloadDefaults()),
+                                                  deploymentPlan),
                       String.format("AttiniPostExecutionActions%s", deploymentPlan.getDeploymentPlanName()),
                       createStateMachinePostHook(sfnResourceName));
     }
@@ -134,18 +144,39 @@ public class TransformDeploymentPlanCloudFormation {
                         .stream()
                         .filter(map -> map.getValue()
                                           .get(TYPE_KEY)
-                                          .equals(ATTINI_DEPLOY_DEPLOYMENT_PLAN_TYPE))
+                                          .equals(ATTINI_INFRA_DEPLOY_DEPLOYMENT_PLAN_TYPE) || map.getValue()
+                                                                                                  .get(TYPE_KEY)
+                                                                                                  .equals(ATTINI_APP_DEPLOY_DEPLOYMENT_PLAN_TYPE))
                         .findAny()
-                        .map(fromValue -> new DeploymentPlanWrapper(
-                                fromValue.getKey(), createDeploymentPlanResource(fromValue.getValue()),
-                                objectMapper));
+                        .map(fromValue -> {
+
+                            JsonNode jsonNode = objectMapper.valueToTree(fromValue);
+                            JsonNode deploymentPlan = jsonNode.path(fromValue.getKey()).path("Properties").path("DeploymentPlan");
+                            if (deploymentPlan.isArray()){
+                                logger.info("Transforming simple syntax");
+                                JsonNode transformedSteps = transformSimpleSyntax.transform(deploymentPlan);
+                                ObjectNode properties = (ObjectNode) jsonNode.path(fromValue.getKey()).path("Properties");
+                                properties.set("DeploymentPlan",transformedSteps);
+                            }
+                           return new DeploymentPlanWrapper(
+                                    fromValue.getKey(),
+                                    createDeploymentPlanResource(jsonNode.path(fromValue.getKey())),
+                                    objectMapper,
+                                    fromValue.getValue()
+                                             .get(TYPE_KEY)
+                                             .equals(ATTINI_INFRA_DEPLOY_DEPLOYMENT_PLAN_TYPE) ? INFRA : APP
+                            );
+                        }).map(deploymentPlanWrapper -> {
+                    System.out.println(deploymentPlanWrapper);
+                    return deploymentPlanWrapper;
+                });
     }
 
     private static void validateOnlyOneDeploymentPlan(Map<String, Map<String, Object>> resources) {
         if (resources.values()
                      .stream()
                      .map(entry -> entry.get(TYPE_KEY))
-                     .filter(ATTINI_DEPLOY_DEPLOYMENT_PLAN_TYPE::equals)
+                     .filter(ATTINI_INFRA_DEPLOY_DEPLOYMENT_PLAN_TYPE::equals)
                      .count() > 1) {
 
             throw new TransformDeploymentPlanException("More then one deployment plan detected.");
@@ -170,15 +201,15 @@ public class TransformDeploymentPlanCloudFormation {
                                                   Entry::getValue));
     }
 
-    private DeploymentPlanResource createDeploymentPlanResource(Object fromValue) {
+    private DeploymentPlanResource createDeploymentPlanResource(JsonNode fromValue) {
         try {
-            return objectMapper.convertValue(fromValue, DeploymentPlanResource.class);
-        } catch (IllegalArgumentException e) {
+            return objectMapper.treeToValue(fromValue, DeploymentPlanResource.class);
+        } catch (IllegalArgumentException | JsonProcessingException e) {
             Throwable rootCause = ExceptionUtils.getRootCause(e);
             if (rootCause instanceof IllegalArgumentException cause) {
                 throw cause;
             }
-            throw e;
+            throw new IllegalArgumentException(e.getMessage(), e.getCause());
         }
     }
 
@@ -195,17 +226,21 @@ public class TransformDeploymentPlanCloudFormation {
 
     }
 
-    private Map<String, Object> createStateMachineResource(DeploymentPlanResource deploymentPlanData) {
-        SfnProperties properties = getSfnProperties(deploymentPlanData.getDeploymentPlanProperties());
-        HashMap<String, Object> metadata = new HashMap<>(deploymentPlanData.getMetadata());
+    private Map<String, Object> createStateMachineResource(DeploymentPlanWrapper deploymentPlanWrapper) {
+        SfnProperties properties = getSfnProperties(deploymentPlanWrapper);
+        HashMap<String, Object> metadata = new HashMap<>(deploymentPlanWrapper.getDeploymentPlanResource()
+                                                                              .getMetadata());
         metadata.put("AttiniSteps", properties.attiniManagedSteps);
         return Map.of(TYPE_KEY, "AWS::Serverless::StateMachine",
                       "Properties", properties.sfnProperties,
                       "Metadata", metadata);
     }
 
-    private SfnProperties getSfnProperties(DeploymentPlanProperties deploymentPlanProperties) {
+    private SfnProperties getSfnProperties(DeploymentPlanWrapper deploymentPlanWrapper) {
         Map<String, Object> sfnProperties = new HashMap<>();
+
+        DeploymentPlanProperties deploymentPlanProperties = deploymentPlanWrapper.getDeploymentPlanResource()
+                                                                                 .getDeploymentPlanProperties();
 
         if (deploymentPlanProperties.getPolicies().isEmpty() &&
             deploymentPlanProperties.getRoleArn().isEmpty() &&
@@ -220,7 +255,7 @@ public class TransformDeploymentPlanCloudFormation {
         }
 
         DeploymentPlanDefinition deploymentPlanDefinition = deploymentPlanStepsCreator.createDefinition(
-                deploymentPlanProperties);
+                deploymentPlanWrapper);
         sfnProperties.put("Definition", deploymentPlanDefinition.definition());
         sfnProperties.put("Tags", Map.of("AttiniProvider", "DeploymentPlan"));
 
@@ -269,7 +304,11 @@ public class TransformDeploymentPlanCloudFormation {
     private static Map<String, Object> createDeploymentPlanTrigger(String sfnResourceName,
                                                                    AttiniRunners attiniRunners,
                                                                    Object parameters,
-                                                                   Map<String, Object> payloadDefaults) {
+                                                                   DeploymentPlanWrapper deploymentPlanWrapper) {
+
+        Map<String, Object> payloadDefaults = deploymentPlanWrapper.getDeploymentPlanResource()
+                                                                   .getDeploymentPlanProperties()
+                                                                   .getPayloadDefaults();
         Map<String, Object> properties = new HashMap<>();
         properties.put("ServiceToken",
                        Map.of("Fn::Sub",
@@ -296,7 +335,16 @@ public class TransformDeploymentPlanCloudFormation {
 
         }
 
-        return Map.of(TYPE_KEY, "Custom::AttiniDeploymentPlanTrigger", "Properties", properties);
+        if (deploymentPlanWrapper.getDeploymentPlanType() == INFRA) {
+            return Map.of(TYPE_KEY, "Custom::AttiniDeploymentPlanTrigger", "Properties", properties);
+        } else {
+
+            deploymentPlanWrapper.getDeploymentPlanResource()
+                                 .getDeploymentPlanProperties()
+                                 .getName()
+                                 .ifPresent(cfnString -> properties.put("AppPipelineName", cfnString));
+            return Map.of(TYPE_KEY, "Custom::AttiniAppDeploymentPlanTrigger", "Properties", properties);
+        }
 
     }
 

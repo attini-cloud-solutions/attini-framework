@@ -3,6 +3,9 @@ package attini.deploy.origin.bean.config;
 
 import java.net.URI;
 import java.time.Duration;
+
+import attini.deploy.origin.appdeployment.AppDeploymentDataFacade;
+import attini.deploy.origin.appdeployment.AppDeploymentFacade;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,6 +42,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.sfn.SfnClient;
 import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.ssm.SsmClient;
 
@@ -60,7 +64,7 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
-    InitDeployEventFactory initDeployEventFactory(ObjectMapper objectMapper){
+    InitDeployEventFactory initDeployEventFactory(ObjectMapper objectMapper) {
         return new InitDeployEventFactory(objectMapper);
     }
 
@@ -79,7 +83,7 @@ public class BeanConfig {
 
     @ApplicationScoped
     public DeployInitStackService deployInitStackService(EnvironmentVariables environmentVariables,
-                                                        @CustomAwsClient CloudFormationClient cloudFormationClient) {
+                                                         @CustomAwsClient CloudFormationClient cloudFormationClient) {
         return new DeployInitStackService(cloudFormationClient,
                                           environmentVariables);
 
@@ -149,6 +153,19 @@ public class BeanConfig {
     }
 
     @ApplicationScoped
+    public AppDeploymentDataFacade appDeploymentDataFacade(@CustomAwsClient DynamoDbClient dynamoDbClient,
+                                                           EnvironmentVariables environmentVariables) {
+        return new AppDeploymentDataFacade(environmentVariables, dynamoDbClient);
+    }
+
+    @ApplicationScoped
+    public AppDeploymentFacade appDeploymentFacade(@CustomAwsClient SfnClient sfnClient,
+                                                   AppDeploymentDataFacade appDeploymentDataFacade,
+                                                   ObjectMapper objectMapper, DeployDataFacade deployDataFacade) {
+        return new AppDeploymentFacade(sfnClient, appDeploymentDataFacade, objectMapper, deployDataFacade);
+    }
+
+    @ApplicationScoped
     public InitDeployService initDeployService(PublishArtifactService publishArtifactService,
                                                DeployInitStackService deployInitStackService,
                                                DeployDataFacade deployDataFacade,
@@ -157,7 +174,7 @@ public class BeanConfig {
                                                MonitoringFacade monitoringFacade,
                                                StepGuardFacade stepGuardFacade,
                                                DistributionDataFacade distributionDataFacade,
-                                               @CustomAwsClient SsmClient ssmClient) {
+                                               @CustomAwsClient SsmClient ssmClient, AppDeploymentFacade appDeploymentFacade) {
         return new InitDeployService(publishArtifactService,
                                      deployInitStackService,
                                      deployDataFacade,
@@ -166,7 +183,8 @@ public class BeanConfig {
                                      lifeCycleService, monitoringFacade,
                                      new SystemClockFacade(),
                                      stepGuardFacade,
-                                     distributionDataFacade);
+                                     distributionDataFacade,
+                                     appDeploymentFacade);
     }
 
     @CustomAwsClient
@@ -191,7 +209,9 @@ public class BeanConfig {
                            .region(Region.of(environmentVariables.getAwsRegion()))
                            .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
                            .overrideConfiguration(defaultClientOverride())
-                           .httpClient(UrlConnectionHttpClient.builder().connectionTimeout(Duration.ofSeconds(20)).build())
+                           .httpClient(UrlConnectionHttpClient.builder()
+                                                              .connectionTimeout(Duration.ofSeconds(20))
+                                                              .build())
                            .endpointOverride(
                                    getAwsServiceEndpoint("lambda", environmentVariables.getAwsRegion())
                            )
@@ -234,48 +254,64 @@ public class BeanConfig {
 
     @CustomAwsClient
     @ApplicationScoped
-    public DynamoDbClient dynamoDbClient(EnvironmentVariables environmentVariables){
-       return DynamoDbClient.builder()
-                      .region(Region.of(environmentVariables.getAwsRegion()))
-                      .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
-                      .overrideConfiguration(defaultClientOverride())
-                      .httpClient(UrlConnectionHttpClient.builder().build())
-                      .endpointOverride(
-                              getAwsServiceEndpoint("dynamodb", environmentVariables.getAwsRegion())
-                      )
-                      .build();
+    public DynamoDbClient dynamoDbClient(EnvironmentVariables environmentVariables) {
+        return DynamoDbClient.builder()
+                             .region(Region.of(environmentVariables.getAwsRegion()))
+                             .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                             .overrideConfiguration(defaultClientOverride())
+                             .httpClient(UrlConnectionHttpClient.builder().build())
+                             .endpointOverride(
+                                     getAwsServiceEndpoint("dynamodb", environmentVariables.getAwsRegion())
+                             )
+                             .build();
     }
 
     @CustomAwsClient
     @ApplicationScoped
-    public DynamoDbAsyncClient dynamoDbAsyncClient(EnvironmentVariables environmentVariables){
+    public SfnClient sfnClient(EnvironmentVariables environmentVariables) {
+        String region = environmentVariables.getAwsRegion();
+        return SfnClient.builder()
+                        .region(Region.of(region))
+                        .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                        .overrideConfiguration(defaultClientOverride())
+                        .httpClient(UrlConnectionHttpClient.builder().build())
+                        .endpointOverride(getAwsServiceEndpoint("states", region))
+                        .build();
+
+    }
+
+    @CustomAwsClient
+    @ApplicationScoped
+    public DynamoDbAsyncClient dynamoDbAsyncClient(EnvironmentVariables environmentVariables) {
         return DynamoDbAsyncClient.builder()
-                           .region(Region.of(environmentVariables.getAwsRegion()))
-                           .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
-                           .overrideConfiguration(defaultClientOverride())
-                           .httpClient(NettyNioAsyncHttpClient.builder()
-                                                              .maxConcurrency(1000)
-                                                              .connectionTimeout(Duration.ofSeconds(1000))
-                                                              .connectionAcquisitionTimeout(Duration.ofSeconds(1000))
-                                                              .maxPendingConnectionAcquires(10_000)
-                                                              .build())
-                           .endpointOverride(
-                                   getAwsServiceEndpoint("dynamodb", environmentVariables.getAwsRegion())
-                           )
-                           .build();
+                                  .region(Region.of(environmentVariables.getAwsRegion()))
+                                  .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                                  .overrideConfiguration(defaultClientOverride())
+                                  .httpClient(NettyNioAsyncHttpClient.builder()
+                                                                     .maxConcurrency(1000)
+                                                                     .connectionTimeout(Duration.ofSeconds(1000))
+                                                                     .connectionAcquisitionTimeout(Duration.ofSeconds(
+                                                                             1000))
+                                                                     .maxPendingConnectionAcquires(10_000)
+                                                                     .build())
+                                  .endpointOverride(
+                                          getAwsServiceEndpoint("dynamodb", environmentVariables.getAwsRegion())
+                                  )
+                                  .build();
     }
 
     @CustomAwsClient
     @ApplicationScoped
-    public CloudFormationClient cloudFormationClient(EnvironmentVariables environmentVariables){
+    public CloudFormationClient cloudFormationClient(EnvironmentVariables environmentVariables) {
         return CloudFormationClient.builder()
-                            .region(Region.of(environmentVariables.getAwsRegion()))
-                            .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
-                            .httpClient(UrlConnectionHttpClient.builder().build())
-                            .overrideConfiguration(defaultClientOverride())
-                            .endpointOverride(getAwsServiceEndpoint("cloudformation", environmentVariables.getAwsRegion())
-                            )
-                            .build();
+                                   .region(Region.of(environmentVariables.getAwsRegion()))
+                                   .credentialsProvider(EnvironmentVariableCredentialsProvider.create())
+                                   .httpClient(UrlConnectionHttpClient.builder().build())
+                                   .overrideConfiguration(defaultClientOverride())
+                                   .endpointOverride(getAwsServiceEndpoint("cloudformation",
+                                                                           environmentVariables.getAwsRegion())
+                                   )
+                                   .build();
     }
 
     private static ClientOverrideConfiguration defaultClientOverride() {

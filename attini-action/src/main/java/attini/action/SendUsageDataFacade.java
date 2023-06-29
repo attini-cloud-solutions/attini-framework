@@ -15,6 +15,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import attini.action.facades.deployorigin.DeployOriginFacade;
+import attini.action.facades.deployorigin.DeploymentName;
 import attini.action.facades.stackdata.DeploymentPlanDataFacade;
 import attini.action.facades.stepfunction.ExecutionSummery;
 import attini.action.facades.stepfunction.StepFunctionFacade;
@@ -186,9 +187,9 @@ public class SendUsageDataFacade {
                                                       .roleSessionName(
                                                               "send-usage-statistics")
                                                       .tags(toTag(DISTRIBUTION_NAME,
-                                                                  executionSummery.getDistributionName()),
+                                                                  executionSummery.getDistributionName().asString()),
                                                             toTag(ENVIRONMENT,
-                                                                  executionSummery.getEnvironment()),
+                                                                  executionSummery.getEnvironment().asString()),
                                                             toTag(DEPLOY_TYPE,
                                                                   "deployEnd"),
                                                             toTag(EXECUTION_ARN,
@@ -249,21 +250,21 @@ public class SendUsageDataFacade {
                                                                              .dataType(
                                                                                      "String")
                                                                              .stringValue(
-                                                                                     executionSummery.getEnvironment())
+                                                                                     executionSummery.getEnvironment().asString())
                                                                              .build(),
                                                         "distributionName",
                                                         MessageAttributeValue.builder()
                                                                              .dataType(
                                                                                      "String")
                                                                              .stringValue(
-                                                                                     executionSummery.getDistributionName())
+                                                                                     executionSummery.getDistributionName().asString())
                                                                              .build()))
                                                 .build());
 
         waitForCompleted(assumeRoleFeature, publishFeature);
 
         deploymentPlanDataFacade.saveFinalStatus(sfnArn, status, startTime);
-        deployOriginFacade.setDeploymentPlanStatus(executionSummery.getEnvironment() + "-" + executionSummery.getDistributionName(),
+        deployOriginFacade.setDeploymentPlanStatus(DeploymentName.create(executionSummery.getEnvironment(), executionSummery.getDistributionName()),
                                                    executionSummery.getObjectIdentifier(),
                                                    status);
     }

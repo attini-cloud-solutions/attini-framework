@@ -12,7 +12,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 @RegisterForReflection
 public class Version {
 
-    String value;
+    private final String value;
 
     private Version(String value) {
         this.value = requireNonNull(value, "value");

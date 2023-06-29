@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 import org.jboss.logging.Logger;
 
 import attini.deploy.origin.config.AttiniConfig;
+import attini.deploy.origin.config.DistributionType;
 import attini.deploy.origin.system.EnvironmentVariables;
 import attini.domain.DistributionContext;
 import attini.domain.DistributionId;
@@ -43,7 +44,24 @@ public class DynamoDeployDataFacade implements DeployDataFacade {
         this.environmentVariables = requireNonNull(environmentVariables, "environmentVariables");
     }
 
-    public void save(SaveDeploymentDataRequest request) {
+
+
+    @Override
+    public void savePlatformDeployment(SaveDeploymentDataRequest request) {
+        save(request, null, DistributionType.PLATFORM, null);
+    }
+
+    @Override
+    public void saveAppDeployment(SaveDeploymentDataRequest request,
+                     String stackName,
+                     String sfnArn) {
+        save(request, stackName, DistributionType.APP, sfnArn);
+    }
+
+    private void save(SaveDeploymentDataRequest request,
+                     String stackName,
+                     DistributionType distributionType,
+                     String sfnArn) {
 
         logger.info("Saving deployment plan source data");
         Map<String, AttributeValue> deployData = new HashMap<>();
@@ -62,17 +80,37 @@ public class DynamoDeployDataFacade implements DeployDataFacade {
                                                                                                                entry.getValue())));
             deployData.put("distributionTags", toAttribute(attiniDistributionTags));
 
-            attiniConfig.getAttiniInitDeployStackConfig()
-                        .ifPresent(attiniInitDeployStackConfig ->
-                                           deployData.put("stackName",
-                                                          toAttribute(
-                                                                  attiniInitDeployStackConfig
-                                                                          .getInitDeployStackName())));
+            if (stackName == null) {
+                attiniConfig.getAttiniInitDeployStackConfig()
+                            .ifPresent(attiniInitDeployStackConfig ->
+                                               deployData.put("stackName",
+                                                              toAttribute(
+                                                                      attiniInitDeployStackConfig
+                                                                              .getInitDeployStackName())));
+            } else {
+
+                AttributeValue attributeValue = dynamoDbClient.getItem(GetItemRequest.builder()
+                                                                                     .tableName(environmentVariables.getResourceStatesTableName())
+                                                                                     .key(Map.of("resourceType",
+                                                                                                 AttributeValue.builder()
+                                                                                                               .s("DeploymentPlan")
+                                                                                                               .build(),
+                                                                                                 "name",
+                                                                                                 AttributeValue.builder().s(sfnArn).build()))
+                                                                                     .build()).item().get("attiniSteps");
+
+                if (attributeValue != null && attributeValue.hasL()){
+                    deployData.put("attiniSteps",attributeValue);
+                }
+                deployData.put("stackName",
+                               toAttribute(stackName));
+            }
 
             attiniConfig.getVersion().ifPresent(version -> deployData.put("version", toAttribute(version.asString())));
 
 
         });
+
 
         DistributionContext distributionContext = request.getDistributionContext();
 
@@ -91,9 +129,13 @@ public class DynamoDeployDataFacade implements DeployDataFacade {
         deployData.put("initStackErrors", AttributeValue.builder().l(Collections.emptyList()).build());
         deployData.put("errors", AttributeValue.builder().m(Collections.emptyMap()).build());
         deployData.put("deploymentSource", toAttribute(deploySource));
-
+        deployData.put("deploymentType",
+                       distributionType == DistributionType.APP ? toAttribute("app") : toAttribute("platform"));
         deployData.put("initStackUnchanged", AttributeValue.builder().bool(request.isUnchanged()).build());
+        if (distributionType == DistributionType.APP){
+            deployData.put("deploymentPlanCount", AttributeValue.builder().n("1").build());
 
+        }
         request.getError().ifPresent(error -> {
             deployData.put("errorMessage", toAttribute(error.getErrorMessage()));
             deployData.put("errorCode", toAttribute(error.getErrorCode()));

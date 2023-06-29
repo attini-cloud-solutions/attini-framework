@@ -76,7 +76,7 @@ public class AttiniStepLoader {
         if (project.isMissingNode()) {
             throw new IllegalArgumentException("Project is missing in Sam step: " + stepName);
         }
-        if (project.path("Path").isMissingNode()) {
+        if (project.path("Path").isMissingNode() && project.path("Path.$").isMissingNode()) {
             throw new IllegalArgumentException("Project.Path is missing in Sam step: " + stepName);
         }
 
@@ -89,7 +89,7 @@ public class AttiniStepLoader {
 
         }
 
-        if (!project.path("Path").isTextual()) {
+        if (!project.path("Path").isTextual() && !project.path("Path.$").isTextual()) {
             throw new IllegalArgumentException("Project.Path in AttiniSam step should be a string, step: " + stepName);
         }
 
@@ -112,20 +112,31 @@ public class AttiniStepLoader {
 
     }
 
+    private String geKey(JsonNode jsonNode, String key){
+        String jsonPathKeyName = key + ".$";
+        if (!jsonNode.path(jsonPathKeyName).isMissingNode()){
+            return jsonPathKeyName;
+        }
+
+        return key;
+    }
+
     public Map<AttiniStep, JsonNode> getAttiniCdk(JsonNode originalStep,
                                                   String stepName,
                                                   Map<String, String> nextReplacements, String defaultRunner) {
-        JsonNode path = originalStep.path("Properties").path("Path");
+        JsonNode properties = originalStep.path("Properties");
+        String pathKey = geKey(properties, "Path");
+        JsonNode path = properties.path(pathKey);
         if (path.isMissingNode() || path.asText().isBlank()) {
-            ObjectNode properties = (ObjectNode) originalStep.get("Properties");
-            properties.put("Path", "./");
+            ObjectNode propertiesObjectNode = (ObjectNode) originalStep.get("Properties");
+            propertiesObjectNode.put(pathKey, "./");
         } else if (path.asText().startsWith("/")) {
-            ObjectNode properties = (ObjectNode) originalStep.get("Properties");
-            properties.put("Path", "." + properties.get("Path").asText());
+            ObjectNode propertiesObjectNode = (ObjectNode) originalStep.get("Properties");
+            propertiesObjectNode.put(pathKey, "." + properties.get(pathKey).asText());
         }
 
 
-        JsonNode diffNode = originalStep.path("Properties").path("Diff");
+        JsonNode diffNode = properties.path(geKey(properties, "Diff"));
 
         if (!diffNode.isMissingNode() && diffNode.isValueNode()) {
             throw new IllegalArgumentException("\"Diff\" in the AttiniCdk step should be an object.");

@@ -4,6 +4,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -105,7 +107,7 @@ class CfnHandlerTest {
     }
 
     public static AttiniCfnInput attiniCfnInput() {
-        return new AttiniCfnInput(cfnConfig(), "AttiniCfn", TestBuilders.aMetaData(), null, deployOriginData(), null);
+        return new AttiniCfnInput(cfnConfig(), "AttiniCfn", TestBuilders.aMetaData(), null, deployOriginData(), null, null);
     }
 
     public static CfnConfig cfnConfig() {
@@ -134,7 +136,7 @@ class CfnHandlerTest {
                                     "init-stack",
                                     null,
                                     null,
-                                    false);
+                                    false, Collections.emptyMap());
     }
 
 }

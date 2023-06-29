@@ -15,7 +15,10 @@ import lombok.ToString;
 
 public interface DeployDataFacade {
 
-    void save(SaveDeploymentDataRequest request);
+    void savePlatformDeployment(SaveDeploymentDataRequest request);
+
+    void saveAppDeployment(SaveDeploymentDataRequest request,
+              String stackName, String sfnArn);
 
     int countDeployDataAfterDate(DistributionName distributionName, Environment environment, LocalDate from);
 

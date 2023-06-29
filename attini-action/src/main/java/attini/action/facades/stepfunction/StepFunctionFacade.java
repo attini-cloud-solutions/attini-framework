@@ -17,6 +17,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import attini.domain.DistributionId;
+import attini.domain.DistributionName;
+import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
 import software.amazon.awssdk.services.sfn.SfnClient;
 import software.amazon.awssdk.services.sfn.model.ExecutionListItem;
@@ -73,10 +76,17 @@ public class StepFunctionFacade {
         try {
             JsonNode jsonNode = objectMapper.readTree(output);
 
-            String distributionName = jsonNode.get("deploymentOriginData").get("distributionName").asText();
-            String environment = jsonNode.get("deploymentOriginData").get("environment").asText();
-            String distributionId = jsonNode.get("deploymentOriginData").get("distributionId").asText();
-            String objectIdentifier = jsonNode.get("deploymentOriginData").get("objectIdentifier").asText();
+            DistributionName distributionName = DistributionName.of(jsonNode.get("deploymentOriginData")
+                                                                            .get("distributionName")
+                                                                            .asText());
+            Environment environment = Environment.of(jsonNode.get("deploymentOriginData").get("environment").asText());
+
+            DistributionId distributionId = DistributionId.of(jsonNode.get("deploymentOriginData")
+                                                                      .get("distributionId")
+                                                                      .asText());
+            ObjectIdentifier objectIdentifier = ObjectIdentifier.of(jsonNode.get("deploymentOriginData")
+                                                                            .get("objectIdentifier")
+                                                                            .asText());
 
 
             return ExecutionSummery.builder()
@@ -84,7 +94,7 @@ public class StepFunctionFacade {
                                    .setEnvironment(environment)
                                    .setDistributionName(distributionName)
                                    .setDistributionId(distributionId)
-                                   .setObjectIdentifier(ObjectIdentifier.of(objectIdentifier))
+                                   .setObjectIdentifier(objectIdentifier)
                                    .build();
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Could not parse json", e);

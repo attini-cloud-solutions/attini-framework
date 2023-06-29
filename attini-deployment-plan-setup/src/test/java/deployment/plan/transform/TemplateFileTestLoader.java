@@ -15,6 +15,11 @@ public class TemplateFileTestLoader implements TemplateFileLoader {
     }
 
     @Override
+    public File getAppDeployStateTemplate() {
+        return new File(Objects.requireNonNull(this.getClass().getResource("/templates/app-deploy-data-state.json")).getFile());
+    }
+
+    @Override
     public File getAttiniCfnTemplate() {
         return new File(Objects.requireNonNull(this.getClass().getResource("/templates/attini-cfn-template.json")).getFile());
 

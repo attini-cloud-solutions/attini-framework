@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import deployment.plan.system.EnvironmentVariables;
+import deployment.plan.transform.simplesyntax.TransformSimpleSyntax;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.mockito.InjectMock;
 import jakarta.inject.Inject;
@@ -55,7 +56,7 @@ class TransformDeploymentPlanCloudFormationTest {
         transformDeploymentPlanCloudFormation = new TransformDeploymentPlanCloudFormation(environmentVariables,
                                                                                           ec2Client,
                                                                                           objectMapper,
-                                                                                          deploymentPlanStepsCreator);
+                                                                                          deploymentPlanStepsCreator, new TransformSimpleSyntax(objectMapper));
 
     }
 

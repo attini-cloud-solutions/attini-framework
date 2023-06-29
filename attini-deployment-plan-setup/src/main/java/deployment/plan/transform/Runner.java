@@ -9,13 +9,11 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
-import lombok.ToString;
 
 
 @Builder(toBuilder = true)
 @EqualsAndHashCode
 @RegisterForReflection
-@ToString
 @JsonInclude(JsonInclude.Include.NON_ABSENT)
 public class Runner {
 
@@ -113,5 +111,29 @@ public class Runner {
 
     public CfnString getMemory() {
         return memory;
+    }
+
+    @Override
+    public String toString() {
+        return "Runner{" +
+               "name='" + name + '\'' +
+               ", subnets=" + subnets +
+               ", securityGroups=" + securityGroups +
+               ", assignPublicIp=" + assignPublicIp +
+               ", maxConcurrentJobs=" + maxConcurrentJobs +
+               ", idleTimeToLive=" + idleTimeToLive +
+               ", jobTimeout=" + jobTimeout +
+               ", logLevel=" + logLevel +
+               ", taskDefinitionArn=" + taskDefinitionArn +
+               ", containerName=" + containerName +
+               ", cluster=" + cluster +
+               ", queueUrl=" + queueUrl +
+               ", roleArn=" + roleArn +
+               ", installationCommands=" + installationCommands +
+               ", installationCommandsTimeout=" + installationCommandsTimeout +
+               ", ec2Configuration=" + ec2Configuration +
+               ", cpu=" + cpu +
+               ", memory=" + memory +
+               '}';
     }
 }

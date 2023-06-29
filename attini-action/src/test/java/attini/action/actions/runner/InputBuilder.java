@@ -32,6 +32,7 @@ public class InputBuilder {
                                DeployOriginDataTestBuilder.aDeployOriginData().build(),
                                Collections.emptyMap(),
                                Collections.emptyMap(),
+                               Collections.emptyMap(),
                                Collections.emptyMap());
     }
 }

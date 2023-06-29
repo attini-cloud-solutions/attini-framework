@@ -15,5 +15,6 @@ public record ImportInput(
         @JsonProperty("deploymentOriginData") DeployOriginData deployOriginData,
         Map<String, Map<String, String>> dependencies,
         Map<String, Object> customData,
-        Map<String, String> stackParameters) {
+        Map<String, String> stackParameters,
+        Map<String, Object> appConfig) {
 }

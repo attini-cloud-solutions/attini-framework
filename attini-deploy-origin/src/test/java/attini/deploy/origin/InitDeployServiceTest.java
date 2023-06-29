@@ -21,13 +21,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import attini.deploy.origin.deploystack.InitDeployError;
+import attini.deploy.origin.appdeployment.AppDeploymentFacade;
 import attini.deploy.origin.config.AttiniConfig;
 import attini.deploy.origin.config.AttiniConfigTestBuilder;
 import attini.deploy.origin.deploystack.DeployDataFacade;
 import attini.deploy.origin.deploystack.DeployInitStackException;
 import attini.deploy.origin.deploystack.DeployInitStackService;
 import attini.deploy.origin.deploystack.DynamoInitDeployStackFacade;
+import attini.deploy.origin.deploystack.InitDeployError;
 import attini.deploy.origin.lifecycle.LifeCycleService;
 import attini.deploy.origin.stepguard.StepGuardFacade;
 import attini.domain.DistributionContext;
@@ -87,6 +88,9 @@ class InitDeployServiceTest {
     @Mock
     DistributionDataFacade distributionDataFacade;
 
+    @Mock
+    AppDeploymentFacade appDeploymentFacade;
+
     InitDeployService initDeployService;
 
     @BeforeEach
@@ -102,7 +106,8 @@ class InitDeployServiceTest {
                                                   monitoringFacade,
                                                   systemClockFacade,
                                                   stepGuardFacade,
-                                                  distributionDataFacade);
+                                                  distributionDataFacade,
+                                                  appDeploymentFacade);
     }
 
     @Test
@@ -126,13 +131,13 @@ class InitDeployServiceTest {
                                                        attiniConfig.getAttiniInitDeployStackConfig().get(),
                                                        BUCKET_PATH,
                                                        attiniConfig.getAttiniDistributionTags());
-        verify(deployDataFacade).save(DeployDataFacade.SaveDeploymentDataRequest.builder()
-                                                                                .deployTime(DEPLOY_TIME)
-                                                                                .distributionContext(
+        verify(deployDataFacade).savePlatformDeployment(DeployDataFacade.SaveDeploymentDataRequest.builder()
+                                                                                                  .deployTime(DEPLOY_TIME)
+                                                                                                  .distributionContext(
                                                                                         DISTRIBUTION_CONTEXT)
-                                                                                .distributionData(distributionData)
-                                                                                .isUnchanged(false)
-                                                                                .build());
+                                                                                                  .distributionData(distributionData)
+                                                                                                  .isUnchanged(false)
+                                                                                                  .build());
     }
 
     @Test
@@ -157,13 +162,13 @@ class InitDeployServiceTest {
                                                                             .orElse(null),
                                                                 BUCKET_PATH,
                                                                 attiniConfig.getAttiniDistributionTags());
-        verify(deployDataFacade).save(DeployDataFacade.SaveDeploymentDataRequest.builder()
-                                                                                .deployTime(DEPLOY_TIME)
-                                                                                .distributionContext(
+        verify(deployDataFacade).savePlatformDeployment(DeployDataFacade.SaveDeploymentDataRequest.builder()
+                                                                                                  .deployTime(DEPLOY_TIME)
+                                                                                                  .distributionContext(
                                                                                         DISTRIBUTION_CONTEXT)
-                                                                                .distributionData(distributionData)
-                                                                                .isUnchanged(false)
-                                                                                .build());
+                                                                                                  .distributionData(distributionData)
+                                                                                                  .isUnchanged(false)
+                                                                                                  .build());
     }
 
     @Test
@@ -200,14 +205,14 @@ class InitDeployServiceTest {
                                                        attiniConfig.getAttiniInitDeployStackConfig().get(),
                                                        BUCKET_PATH,
                                                        attiniConfig.getAttiniDistributionTags());
-        verify(deployDataFacade).save(DeployDataFacade.SaveDeploymentDataRequest.builder()
-                                                                                .deployTime(DEPLOY_TIME)
-                                                                                .distributionContext(
+        verify(deployDataFacade).savePlatformDeployment(DeployDataFacade.SaveDeploymentDataRequest.builder()
+                                                                                                  .deployTime(DEPLOY_TIME)
+                                                                                                  .distributionContext(
                                                                                         DISTRIBUTION_CONTEXT)
-                                                                                .distributionData(distributionData)
-                                                                                .isUnchanged(false).error(new InitDeployError(stackException.getAwsErrorCode(),
+                                                                                                  .distributionData(distributionData)
+                                                                                                  .isUnchanged(false).error(new InitDeployError(stackException.getAwsErrorCode(),
                                                                                                                               stackException.getAwsErrorMessage()))
-                                                                                .build());
+                                                                                                  .build());
     }
 
     @Test
@@ -228,6 +233,6 @@ class InitDeployServiceTest {
                                                                             .orElse(null),
                                                                 BUCKET_PATH,
                                                                 attiniConfig.getAttiniDistributionTags());
-        verify(deployDataFacade).save(any(DeployDataFacade.SaveDeploymentDataRequest.class));
+        verify(deployDataFacade).savePlatformDeployment(any(DeployDataFacade.SaveDeploymentDataRequest.class));
     }
 }

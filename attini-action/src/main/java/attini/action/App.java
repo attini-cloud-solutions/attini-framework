@@ -2,46 +2,39 @@ package attini.action;
 
 import static java.util.Objects.requireNonNull;
 
-import java.io.UncheckedIOException;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-
-import attini.action.actions.sam.SamPackageRunnerAdapter;
-import attini.action.actions.sam.input.SamInput;
-import jakarta.inject.Inject;
-import jakarta.inject.Named;
 
 import org.jboss.logging.Logger;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import attini.action.actions.cdk.CdkRunnerAdapter;
 import attini.action.actions.cdk.input.CdkInput;
 import attini.action.actions.deploycloudformation.CfnHandler;
 import attini.action.actions.deploycloudformation.input.AttiniCfnInput;
+import attini.action.actions.getdeployorigindata.GetAppDeployOriginDataHandler;
 import attini.action.actions.getdeployorigindata.GetDeployOriginDataHandler;
 import attini.action.actions.merge.MergeUtil;
+import attini.action.actions.posthook.PostPipelineHook;
 import attini.action.actions.readoutput.ImportHandler;
 import attini.action.actions.readoutput.input.ImportInput;
+import attini.action.actions.runner.CouldNotParseInputException;
 import attini.action.actions.runner.RunnerHandler;
 import attini.action.actions.runner.input.RunnerInput;
+import attini.action.actions.sam.SamPackageRunnerAdapter;
+import attini.action.actions.sam.input.SamInput;
 import attini.action.configuration.InitDeployConfigurationHandler;
 import attini.action.domain.DeploymentPlanExecutionMetadata;
-import attini.action.domain.DeploymentPlanStateData;
-import attini.action.facades.artifactstore.ArtifactStoreFacade;
-import attini.action.facades.deployorigin.DeployOriginFacade;
-import attini.action.facades.stackdata.DeploymentPlanDataFacade;
 import attini.action.facades.stackdata.ResourceStateFacade;
 import attini.action.facades.stepfunction.StepFunctionFacade;
-import attini.action.actions.runner.CouldNotParseInputException;
 import attini.action.licence.LicenceAgreementHandler;
 import attini.domain.DeployOriginData;
-import attini.domain.DistributionContext;
 import attini.domain.deserializers.AttiniDeserializationException;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 
 @Named("app")
@@ -50,51 +43,46 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
     private final CfnHandler cfnHandler;
     private final StepFunctionFacade stepFunctionFacade;
     private final GetDeployOriginDataHandler getDeployOriginDataHandler;
-    private final DeployOriginFacade deployOriginFacade;
-    private final SendUsageDataFacade sendUsageDataFacade;
     private final LicenceAgreementHandler licenceAgreementHandler;
     private final InitDeployConfigurationHandler initDeployConfigurationHandler;
     private final RunnerHandler runnerHandler;
     private final ObjectMapper quarkusMapper;
-    private final ArtifactStoreFacade artifactStoreFacade;
     private final ImportHandler importHandler;
     private final ResourceStateFacade resourceStateFacade;
 
-    private final DeploymentPlanDataFacade deploymentPlanDataFacade;
     private final CdkRunnerAdapter cdkRunnerAdapter;
     private final SamPackageRunnerAdapter samPackageRunnerAdapter;
+    private final GetAppDeployOriginDataHandler getAppDeployOriginDataHandler;
+    private final PostPipelineHook postPipelineHook;
 
     @Inject
     public App(CfnHandler cfnHandler,
                StepFunctionFacade stepFunctionFacade,
                GetDeployOriginDataHandler getDeployOriginDataHandler,
-               DeployOriginFacade deployOriginFacade,
-               SendUsageDataFacade sendUsageDataFacade,
                LicenceAgreementHandler licenceAgreementHandler,
                InitDeployConfigurationHandler initDeployConfigurationHandler,
                RunnerHandler runnerHandler,
                ObjectMapper quarkusMapper,
-               ArtifactStoreFacade artifactStoreFacade,
                ImportHandler importHandler,
                ResourceStateFacade resourceStateFacade,
-               DeploymentPlanDataFacade deploymentPlanDataFacade,
-               CdkRunnerAdapter cdkRunnerAdapter, SamPackageRunnerAdapter samPackageRunnerAdapter) {
+               CdkRunnerAdapter cdkRunnerAdapter,
+               SamPackageRunnerAdapter samPackageRunnerAdapter,
+               GetAppDeployOriginDataHandler getAppDeployOriginDataHandler,
+               PostPipelineHook postPipelineHook) {
         this.cfnHandler = requireNonNull(cfnHandler, "deployCfnStackService");
         this.stepFunctionFacade = requireNonNull(stepFunctionFacade, "stepFunctionFacade");
         this.getDeployOriginDataHandler = requireNonNull(getDeployOriginDataHandler, "getDeployOriginDataHandler");
-        this.deployOriginFacade = requireNonNull(deployOriginFacade, "deployOriginFacade");
-        this.sendUsageDataFacade = requireNonNull(sendUsageDataFacade, "sendUsageDataFacade");
         this.licenceAgreementHandler = requireNonNull(licenceAgreementHandler, "licenceAgreementHandler");
         this.initDeployConfigurationHandler = requireNonNull(initDeployConfigurationHandler,
                                                              "initDeployConfigurationHandler");
         this.runnerHandler = requireNonNull(runnerHandler, "runnerHandler");
         this.quarkusMapper = requireNonNull(quarkusMapper, "quarkusMapper");
-        this.artifactStoreFacade = requireNonNull(artifactStoreFacade, "artifactStoreFacade");
         this.importHandler = requireNonNull(importHandler, "readOutputHandler");
         this.resourceStateFacade = requireNonNull(resourceStateFacade, "stackDataFacade");
-        this.deploymentPlanDataFacade = requireNonNull(deploymentPlanDataFacade, "deploymentPlanDataFacade");
         this.cdkRunnerAdapter = requireNonNull(cdkRunnerAdapter, "cdkRunnerAdapter");
         this.samPackageRunnerAdapter = requireNonNull(samPackageRunnerAdapter, "samPackageRunnerAdapter");
+        this.getAppDeployOriginDataHandler = requireNonNull(getAppDeployOriginDataHandler, "getAppDeployOriginDataHandler");
+        this.postPipelineHook = requireNonNull(postPipelineHook, "postPipelineHook");
     }
 
     @SuppressWarnings("unchecked")
@@ -105,7 +93,7 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
         logger.info("Got event: " + inputString);
 
         if (isCloudWatchEvent(input)) {
-            handlePostPipelineHook(input);
+            postPipelineHook.handlePostPipelineHook(input);
             return input;
         }
 
@@ -143,6 +131,11 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
             case "GetDeployOriginData" -> {
                 logger.info("Get deploy data triggered");
                 return getDeployOriginDataHandler.getDeployOriginData(input);
+
+            }
+            case "GetAppDeployOriginData" -> {
+                logger.info("Get app deploy data triggered");
+                return getAppDeployOriginDataHandler.getAppDeployOriginData(input);
             }
             case "DeployCdk" -> {
                 try {
@@ -200,49 +193,7 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
 
     }
 
-    private void handlePostPipelineHook(Map<String, Object> input) {
-        logger.info("Running post pipeline hook");
-        JsonNode jsonNode = quarkusMapper.valueToTree(input);
 
-        sendUsageDataFacade.sendEndUsage(jsonNode.get("detail")
-                                                 .get("executionArn")
-                                                 .asText(),
-                                         jsonNode.get("detail")
-                                                 .get("status")
-                                                 .asText(),
-                                         jsonNode.get("detail")
-                                                 .get("stateMachineArn")
-                                                 .asText(),
-                                         Instant.ofEpochSecond(Long.parseLong(jsonNode.get("detail")
-                                                                                      .get("startDate")
-                                                                                      .asText())));
-
-        DeploymentPlanStateData deploymentPlan = deploymentPlanDataFacade.getDeploymentPlan(jsonNode.get("detail")
-                                                                                                    .get("stateMachineArn")
-                                                                                                    .asText());
-        DistributionContext context = deployOriginFacade.getContext(jsonNode.get("detail")
-                                                                            .get("executionArn")
-                                                                            .asText(),
-                                                                    deploymentPlan.getDeployOriginSourceName());
-
-
-        if ("SUCCEEDED".equals(jsonNode.path("detail")
-                                       .path("status")
-                                       .asText())) {
-
-            saveDistributionOutput(jsonNode.get("detail")
-                                           .get("output"), context);
-        } else {
-            deployOriginFacade.addExecutionError(deploymentPlan.getDeployOriginSourceName(),
-                                                 context.getObjectIdentifier(),
-                                                 jsonNode.path("detail")
-                                                         .path("cause")
-                                                         .asText(),
-                                                 jsonNode.path("detail")
-                                                         .path("error")
-                                                         .asText());
-        }
-    }
 
     private static boolean isCloudWatchEvent(Map<String, Object> input) {
         //"detail-type" indicates its a cloud watch event triggered by the post pipeline hook
@@ -270,20 +221,6 @@ public class App implements RequestHandler<Map<String, Object>, Map<String, Obje
             throw e;
         }
     }
-
-    private void saveDistributionOutput(JsonNode output, DistributionContext context) {
-        try {
-
-
-            artifactStoreFacade.saveDistributionOutput(context.getEnvironment(),
-                                                       context.getDistributionName(),
-                                                       context.getDistributionId(),
-                                                       quarkusMapper.readTree(output.asText()));
-        } catch (JsonProcessingException e) {
-            throw new UncheckedIOException("Could not read distribution meta data from output block", e);
-        }
-    }
-
     private String toJsonString(Map<String, Object> input) {
         try {
             return quarkusMapper.writeValueAsString(input);

@@ -15,5 +15,6 @@ public record AttiniCfnInput(@JsonProperty("Properties") CfnConfig cfnConfig,
                              DeploymentPlanExecutionMetadata deploymentPlanExecutionMetadata,
                              @JsonProperty("output") Map<String, Object> output,
                              @JsonProperty("deploymentOriginData") DeployOriginData deploymentOriginData,
-                             @JsonProperty("customData") Map<String, Object> customData) {
+                             @JsonProperty("customData") Map<String, Object> customData,
+                             @JsonProperty("appConfig") Map<String, Object> appConfig) {
 }

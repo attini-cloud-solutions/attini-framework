@@ -61,7 +61,7 @@ public class Poller <V> {
 
         private Supplier<RuntimeException> timeoutExceptionSupplier;
 
-        Supplier<PollingResult<V>> action;
+        private final Supplier<PollingResult<V>> action;
 
         private Builder(Supplier<PollingResult<V>> action) {
             this.action = action;
@@ -85,7 +85,7 @@ public class Poller <V> {
         }
 
         public Poller<V> build() {
-            return new Poller<V>(this);
+            return new Poller<>(this);
         }
     }
 }

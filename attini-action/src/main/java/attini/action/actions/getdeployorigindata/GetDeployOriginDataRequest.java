@@ -3,7 +3,7 @@
  * All Rights Reserved
  */
 
-package attini.action.domain;
+package attini.action.actions.getdeployorigindata;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;

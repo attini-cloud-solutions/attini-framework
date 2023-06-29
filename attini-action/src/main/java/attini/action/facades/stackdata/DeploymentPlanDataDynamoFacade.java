@@ -7,7 +7,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 import attini.action.domain.DeploymentPlanStateData;
+import attini.action.facades.deployorigin.DeploymentName;
 import attini.action.system.EnvironmentVariables;
+import attini.domain.DistributionName;
+import attini.domain.Environment;
 import attini.domain.ObjectIdentifier;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeAction;
@@ -70,16 +73,16 @@ public class DeploymentPlanDataDynamoFacade implements DeploymentPlanDataFacade 
                                                       .build();
         GetItemResponse getItemResponse = dynamoDbClient.getItem(getItemRequest);
         deployOriginSourceNames.put("DistributionName", getItemResponse.item().get("distributionName").s());
-        deployOriginSourceNames.put("EnvironmentName", getItemResponse.item().get("environment").s());
-        String sourceName = String.format("%s-%s",
-                                          deployOriginSourceNames.get("EnvironmentName"),
-                                          deployOriginSourceNames.get("DistributionName"));
+        String environment = getItemResponse.item().get("environment").s();
+        deployOriginSourceNames.put("EnvironmentName", environment);
+        DeploymentName sourceName = DeploymentName.create(Environment.of( deployOriginSourceNames.get("EnvironmentName")), DistributionName.of(deployOriginSourceNames.get("DistributionName")));
         String payloadDefaults = getItemResponse.item().get("payloadDefaults") != null ? getItemResponse.item()
                                                                                           .get("payloadDefaults")
                                                                                           .s() : "{}"; //default value is strictly for backward compatability, would throw en exception if someone would rerun an old deployment plan
 
 
-        return new DeploymentPlanStateData(sourceName, ObjectIdentifier.of( getItemResponse.item().get("attiniObjectIdentifier").s()), payloadDefaults);
+        return new DeploymentPlanStateData(sourceName, ObjectIdentifier.of( getItemResponse.item().get("attiniObjectIdentifier").s()), payloadDefaults,
+                                           Environment.of(environment));
 
     }
 

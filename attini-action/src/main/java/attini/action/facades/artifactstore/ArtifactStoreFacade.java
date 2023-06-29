@@ -2,7 +2,6 @@ package attini.action.facades.artifactstore;
 
 import static java.util.Objects.requireNonNull;
 
-import java.io.IOException;
 import java.io.UncheckedIOException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -11,10 +10,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import attini.action.facades.S3Facade;
 import attini.action.facades.stackdata.DistributionDataFacade;
+import attini.action.system.EnvironmentVariables;
 import attini.domain.DistributionId;
 import attini.domain.DistributionName;
 import attini.domain.Environment;
-import attini.action.system.EnvironmentVariables;
 
 public class ArtifactStoreFacade {
 
@@ -56,33 +55,11 @@ public class ArtifactStoreFacade {
         }
     }
 
-    public MetadataFile getMetadataFile(Environment environment,
-                                        DistributionName distributionName,
-                                        DistributionId distributionId) {
-
-        byte[] metadataFile = s3Facade.getObject(bucketName,
-                                                 createMetadataKey(environment, distributionName, distributionId));
-
-        try {
-            return objectMapper.readValue(metadataFile, MetadataFile.class);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-
-    }
-
     private static String createOutputKey(Environment environment,
                                           DistributionName distributionName,
                                           DistributionId distributionId) {
         return "outputs/" + environment.asString() + "/" + distributionName.asString() + "/" + distributionId.asString() + "/output.json";
     }
-
-    private static String createMetadataKey(Environment environment,
-                                            DistributionName distributionName,
-                                            DistributionId distributionId) {
-        return environment.asString() + "/" + distributionName.asString() + "/" + distributionId.asString() + "/distribution-origin/attini_data/attini-metadata.json";
-    }
-
 
     public String getOutputUrl(Environment environment,
                                DistributionName distributionName,

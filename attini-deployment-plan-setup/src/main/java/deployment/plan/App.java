@@ -61,7 +61,7 @@ public class App implements RequestHandler<Map<String, Object>, Object> {
             if (isCustomResource(input)) {
                 logger.info("Registering deployment plan");
                 customResourceHandler
-                        .handleCustomResource(input, context);
+                        .handleCustomResource(mapper.readTree(inputString), context);
             }
 
         } catch (JsonProcessingException e) {
