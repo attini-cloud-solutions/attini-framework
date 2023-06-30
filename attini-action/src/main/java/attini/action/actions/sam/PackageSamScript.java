@@ -19,8 +19,8 @@ public class PackageSamScript {
             """;
 
     public static String getPackageSamScript(String path, String buildDir) {
-
-        return PACKAGE_SAM_SCRIPT.formatted(path,
+        String samPath = path.startsWith("/") ? path.substring(1) : path;
+        return PACKAGE_SAM_SCRIPT.formatted(samPath,
                                             buildDir);
     }
 
