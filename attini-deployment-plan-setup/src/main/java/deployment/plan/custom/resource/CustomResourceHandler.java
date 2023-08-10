@@ -66,12 +66,12 @@ public class CustomResourceHandler {
 
             if (isDeploymentPlanCustomResource(inputJson)) {
                 registerDeploymentPlan(inputJson);
-            } else if (isAppDeploymentPlanCustomResource(inputJson)) {
-                registerAppDeploymentPlan(inputJson);
             } else if (isDeleteCustomResource(inputJson)) {
                 responseSender
                         .sendResponse(inputJson.get(RESPONSE_URL).asText(),
                                       createSuccessResponse(inputJson));
+            } else if (isAppDeploymentPlanCustomResource(inputJson)) {
+                registerAppDeploymentPlan(inputJson);
             } else {
                 responseSender
                         .sendResponse(inputJson.get(RESPONSE_URL).asText(),
